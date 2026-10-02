@@ -867,24 +867,30 @@ static const GcModFile MF_HC_PLAIN[] = {
 typedef struct {
     const char *id;
     const char *title;
+    const char *title_en;   /* ★ v6.3: 英文显示名 */
     const char *author;
     const char *note;
+    const char *note_en;    /* ★ v6.3: 英文备注 */
     const GcModFile *files;
     int n;
 } GcBuiltinModDef;
 
 static const GcBuiltinModDef S_MODS[] = {
-    { "megatard",  "MEGATARD v0.9.9 汉化", "Geekmaxxer",
+    { "megatard",  "MEGATARD v0.9.9 汉化", "MEGATARD v0.9.9 (ZH)", "Geekmaxxer",
       "与「经典 ragemenu」互斥（都占 ragemenu）",
+      "Mutually exclusive with Classic ragemenu (both use the ragemenu slot)",
       MF_MEGATARD,  MF_N(MF_MEGATARD) },
-    { "classic",   "经典 ragemenu 简体 v13", "maritoguionyo",
+    { "classic",   "经典 ragemenu 简体 v13", "Classic ragemenu v13 (ZH)", "maritoguionyo",
       "与「MEGATARD」互斥（都占 ragemenu）",
+      "Mutually exclusive with MEGATARD (both use the ragemenu slot)",
       MF_CLASSIC,   MF_N(MF_CLASSIC) },
-    { "hc_combo",  "热咖啡 + 丧尸", "Je11yb0ne/CinnamonCoffee",
+    { "hc_combo",  "热咖啡 + 丧尸", "Hot Coffee + Zombies", "Je11yb0ne/CinnamonCoffee",
       "含丧尸模组；与下一项互斥（都占 simple_zombies）",
+      "Includes the zombies mod; mutually exclusive with the next entry (both use simple_zombies)",
       MF_HC_COMBO,  MF_N(MF_HC_COMBO) },
-    { "hc_plain",  "热咖啡（不含丧尸）", "Je11yb0ne/CinnamonCoffee",
+    { "hc_plain",  "热咖啡（不含丧尸）", "Hot Coffee (no zombies)", "Je11yb0ne/CinnamonCoffee",
       "与上一项互斥（都占 simple_zombies）",
+      "Mutually exclusive with the previous entry (both use simple_zombies)",
       MF_HC_PLAIN,  MF_N(MF_HC_PLAIN) },
 };
 #define S_MODS_N ((int)(sizeof(S_MODS)/sizeof(S_MODS[0])))
@@ -895,11 +901,13 @@ const GcBuiltinMod *gc_script_builtin(int i) {
     if (i < 0 || i >= S_MODS_N) return NULL;
     /* 借着 GcBuiltinMod 的内存布局逐字段返回（同前缀结构，安全） */
     static GcBuiltinMod out;
-    out.id      = S_MODS[i].id;
-    out.title   = S_MODS[i].title;
-    out.author  = S_MODS[i].author;
-    out.note    = S_MODS[i].note;
-    out.n_files = S_MODS[i].n;
+    out.id       = S_MODS[i].id;
+    out.title    = S_MODS[i].title;
+    out.title_en = S_MODS[i].title_en;
+    out.author   = S_MODS[i].author;
+    out.note     = S_MODS[i].note;
+    out.note_en  = S_MODS[i].note_en;
+    out.n_files  = S_MODS[i].n;
     return &out;
 }
 

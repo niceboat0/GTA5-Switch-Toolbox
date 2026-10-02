@@ -113,8 +113,10 @@ const char *gc_script_stock_name(int i);      /* i 越界返回 NULL */
 typedef struct {
     const char *id;       /* 内部标识，如 "megatard" */
     const char *title;    /* 界面显示名（中文，≤24 字符） */
+    const char *title_en; /* ★ v6.3: 英文显示名（g_lang_en=1 时用，可为 NULL=回退 title） */
     const char *author;   /* 原作者署名 */
     const char *note;     /* 一句话备注（互斥关系 / 含什么） */
+    const char *note_en;  /* ★ v6.3: 英文备注（可为 NULL=回退 note） */
     int         n_files;  /* 涉及文件数 */
 } GcBuiltinMod;
 
