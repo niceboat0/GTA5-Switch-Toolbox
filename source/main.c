@@ -85,7 +85,10 @@ static PadState   g_pad;
  * detect_language() 在 main() 开头按系统语言置位 */
 int g_lang_en = 0;
 void detect_language(void) {
-    /* set 服务：读系统语言码（u64，前 8 字节是 "en-US" 这类 ASCII） */
+    /* 🚨 set 服务必须先 setInitialize()，否则所有 set* 调用静默失败
+     *   （v6.3 首版漏了这句 ⇒ 英文系统也不生效，实机反馈） */
+    if (R_FAILED(setInitialize())) return;
+
     u64 langcode = 0;
     if (R_SUCCEEDED(setGetSystemLanguage(&langcode))) {
         SetLanguage sl = SetLanguage_ZHCN;
@@ -98,6 +101,7 @@ void detect_language(void) {
             if (lc[0] == 'e' && lc[1] == 'n') g_lang_en = 1;
         }
     }
+    setExit();
 }
 
 /* ========================================================================= */
@@ -5654,8 +5658,9 @@ int main(int argc, char **argv) {
             } else if (g_tab == TAB_TOOL) {
                 const char *fn = strrchr(g_save_path, '/');
                 fn = fn ? fn + 1 : g_save_path;
-                snprintf(info, sizeof(info), TR("存档: %s   %zu KB   槽位 %d 个   备份 %d 个",
-                                                "Save: %s   %zu KB   slots %d   backups %d"),
+                /* ★ v6.3.1: 末尾带语言标记（lang=en/zh），实机一眼看出语言检测是否生效 */
+                snprintf(info, sizeof(info), TR("存档: %s   %zu KB   槽位 %d 个   备份 %d 个   [lang=zh]",
+                                                "Save: %s   %zu KB   slots %d   backups %d   [lang=en]"),
                          fn, g_save_sz / 1024, g_num_slots, g_num_backups);
             } else {
                 const char *cur_fn = (g_num_slots > 0) ? g_slots[g_active_slot_idx].filename

@@ -3,15 +3,19 @@
 GTA V Switch 移植版（Title ID `0100b00b51230000`）的多功能工具箱 NRO ——
 DLC 管理、脚本 MOD 安装/还原、画质预设、内置模组，一个 .nro 全搞定。
 
-## ⚠️ 使用前必读：备份 update2.rpf
+## ⚠️ 使用前必读：备份 update.rpf 和 update2.rpf
 
-**强烈建议先备份**，任何 RPF 写入操作（装 mod / 卸载 mod / 还原官方）都有小概率翻车：
+**强烈建议先备份**，任何 RPF 写入操作（装 mod / 卸载 mod / 还原官方 / 性能调参写入）都有小概率翻车：
 
 ```
-SD卡:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf
+SD卡:/atmosphere/contents/0100b00b51230000/romfs/update/update.rpf     （约 900MB）
+SD卡:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf    （约 700MB）
 ```
 
-把它复制一份到电脑或 SD 卡其他位置（约 700MB）。出问题时把备份拷回去即可完全恢复。
+把这两个文件都复制一份到电脑或 SD 卡其他位置。出问题时拷回去即可完全恢复：
+- **update2.rpf**：脚本 mod 装在里面（script_rel.rpf）
+- **update.rpf**：gameconfig（性能调参）和 dlclist.xml（DLC 注册）在里面
+
 工具内的「还原官方脚本」只还原 3 个脚本条目，**不能替代完整备份**。
 
 ## 功能（v6.2）

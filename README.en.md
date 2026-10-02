@@ -5,17 +5,22 @@ DLC management, script MOD install/restore, graphics presets and builtin mods, a
 
 English | [中文](README.md)
 
-## ⚠️ Read this first: back up update2.rpf
+## ⚠️ Read this first: back up update.rpf AND update2.rpf
 
-**A backup is strongly recommended.** Any RPF write (mod install / uninstall / stock restore)
-carries a small risk:
+**A backup is strongly recommended.** Any RPF write (mod install / uninstall /
+stock restore / perf tuning write) carries a small risk:
 
 ```
-SDcard:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf
+SDcard:/atmosphere/contents/0100b00b51230000/romfs/update/update.rpf     (~900 MB)
+SDcard:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf    (~700 MB)
 ```
 
-Copy it somewhere safe (PC or another folder on the SD card, ~700 MB). Restoring that file
-recovers everything. The in-tool "Restore stock scripts" only restores 3 script entries —
+Copy **both** files somewhere safe (PC or another folder on the SD card).
+Restoring them recovers everything:
+- **update2.rpf**: script mods live here (script_rel.rpf)
+- **update.rpf**: gameconfig (perf tuning) and dlclist.xml (DLC registration)
+
+The in-tool "Restore stock scripts" only restores 3 script entries —
 **it is not a substitute for a full backup**.
 
 ## Features (v6.2)
