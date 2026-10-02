@@ -39,7 +39,8 @@ SD卡:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf
 3. 确认后自动写入 script_rel.rpf，装完自动回读校验
 4. 互斥的 mod（如两个 ragemenu 系）装第二个前会提示先卸载
 
-**装外部 mod**：把 .nsc 文件放到 SD 卡 `/switch/mods/` 目录（工具会自动创建），
+**装外部 mod**：把 .nsc 文件放到 SD 卡 `/switch/gta5save/script/` 目录
+（工具首次进入脚本页会自动创建，直接丢在 `/switch/gta5save/` 下也能扫到），
 在列表里选中按 A 安装。官方格式（RSC7）和 mod 裸格式都能自动识别。
 
 **还原官方**：模组管理里选「还原官方脚本」的对应项（error_listener /
