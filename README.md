@@ -28,9 +28,8 @@ SD卡:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf
 ### 安装与启动
 
 1. 下载 Release 里的 `gta5save.nro`，复制到 SD 卡 `/switch/` 目录
-2. 游戏文件需位于 `atmosphere/contents/0100b00b51230000/romfs/`（正常安装的移植版都在这）
-3. 按 R 启动游戏进入 hbmenu（或关游戏回 hbmenu），选「GTA5 Switch Toolbox」启动
-4. 工具内：**L/R 切换页签**，十字键上下选条目，A 确认，B 返回/退出
+2. 按 R 启动游戏进入 hbmenu（或关游戏回 hbmenu），选「GTA5 Switch Toolbox」启动
+3. 工具内：**L/R 切换页签**，十字键上下选条目，A 确认，B 返回/退出
 
 ### 脚本 MOD 页（核心功能）
 
