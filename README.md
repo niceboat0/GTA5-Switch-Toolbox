@@ -51,10 +51,18 @@ achievement_controller / shop_controller），可单独还原任意一个。
 
 ### DLC 页
 
-1. 把 PC 移植好的 DLC 文件夹（含 dlcpack 的 RPF）放到 SD 卡对应目录
-2. DLC 页列表会自动扫描，选中按 A 注册（自动写 dlclist.xml + extratitleupdatedata.meta）
-3. 卸载同理，选中已注册的 DLC 按 A 选卸载
-4. ⚠️ 注册后建议重启游戏验证，一次别加太多包
+**目录说明**：
+- **已装目录**（游戏实际读取）：`/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/`
+- **待导入目录**（把 dlcpack 文件夹丢这里，工具扫描后导入）：
+  `/switch/gta5save/dlc/`（推荐）。以下位置也能被扫到：
+  `/switch/gta5save/`、`/switch/GTA5DLC/`、`/dlc/`、`/gta5dlc/`、`/switch/`
+
+**使用方法**：
+1. 把 PC 移植好的 dlcpack 文件夹（内含 `dlc.rpf`）放进待导入目录
+2. DLC 页按 **Y** 切到「待导入列表」，选中按 **A** 导入
+   （自动复制到 dlcpacks/ + 注册 dlclist.xml + extratitleupdatedata.meta）
+3. 已装列表里选中按 A 可注册/注销；⚠️ PC 原格式包会标「会闪退」，别直接导入
+4. 导入后建议重启游戏验证，一次别加太多包
 
 ### 画质页
 
