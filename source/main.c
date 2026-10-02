@@ -4236,7 +4236,7 @@ static int gc_apply_preset(int idx) {
     g_gc_preset = idx;
     g_gc_dirty = 1;
     gc_msg(TR("已套用【%s】: 改 %d 项 / 新增 %d 项%s", "applied [%s]: %d changed / %d added%s"),
-           p->name, n_applied, n_inserted, n_fail ? TR(" (部分失败)", " (partial failure)") : "");
+           g_lang_en && p->name_en ? p->name_en : p->name, n_applied, n_inserted, n_fail ? TR(" (部分失败)", " (partial failure)") : "");
     g_gc_msg_color = n_fail ? C_RED : C_GREEN;
     return GC_OK;
 }
@@ -4531,7 +4531,7 @@ static int gc_verify_on_disk(void) {
         /* 拼成一行再输出：多字节分隔线分开 VAPP 会触发 -Wformat-truncation 噪声 */
         char hl[96];
         if (plist) snprintf(hl, sizeof(hl), "-- 逐项比对 (预设「%s」%d 项) --",
-                            GC_PRESETS[g_gc_preset].name, pn);
+                            (g_lang_en && GC_PRESETS[g_gc_preset].name_en ? GC_PRESETS[g_gc_preset].name_en : GC_PRESETS[g_gc_preset].name), pn);
         else       snprintf(hl, sizeof(hl), "-- 逐项比对 (全部 %d 项) --", GC_NUM_KNOB_META);
         VAPP("%s\n", hl);
     }
@@ -5929,7 +5929,8 @@ int main(int argc, char **argv) {
                     char nb[96];
                     snprintf(nb, sizeof(nb), "[%s] %s",
                              m->weight == 1 ? "S" : m->weight == 2 ? "A"
-                           : m->weight == 3 ? "B" : "C", m->cn);
+                           : m->weight == 3 ? "B" : "C",
+                             g_lang_en ? (m->cn_en ? m->cn_en : m->cn) : m->cn);
                     draw_text(framebuf, lx + 14, iy + 6, 15, nb, sel ? C_ACCENT : wcol);
 
                     char vb[64];
