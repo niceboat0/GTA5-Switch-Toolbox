@@ -24,6 +24,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y zlib1g-dev libssl-dev
+          python3 tests/test_megatard_zh.py --output build/megatard-zh
           python3 tests/test_scripts.py --output build/scripts
           python3 tests/test_packages.py --output build/packages
           python3 tests/test_exporter.py --output build/exporter

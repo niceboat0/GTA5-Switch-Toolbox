@@ -50,7 +50,7 @@ def fixture(page,en):
     elif page==1:
         v.section_count=3
         for i,t in enumerate(['Built-in mods','External scripts','Restore stock'] if en else ['内置模组','外部脚本','恢复官方']):v.sections[i]=u(t)
-        row(v,'MEGATARD v1.0.5' if en else 'MEGATARD v1.0.5（支持中文）','By MEGATARD / 3 scripts' if en else '作者 MEGATARD / 3 个脚本文件','Bundled' if en else '已内置','Conflicts with classic ragemenu.\nConflict checks run automatically. Restart the game after installation.' if en else '与经典 ragemenu 互斥。\n安装会覆盖同名脚本。互斥检测与回读校验自动执行，完成后重启游戏。')
+        row(v,'MEGATARD v1.0.5' if en else 'MEGATARD v1.0.5 中文恢复版','By Geekmaxxer / 3 scripts' if en else '作者 Geekmaxxer / 3 个脚本文件','Bundled' if en else '已内置','Conflicts with classic ragemenu.\nConflict checks run automatically. Restart the game after installation.' if en else '与经典 ragemenu 互斥。\n安装会覆盖同名脚本。互斥检测与回读校验自动执行，完成后重启游戏。')
         row(v,'Classic ragemenu' if en else '经典 ragemenu 简体','By maritoguionyo / 3 scripts' if en else '作者 maritoguionyo / 3 个脚本文件','Bundled' if en else '已内置')
         row(v,'Classic ragemenu (original English)' if en else '经典 ragemenu 原版英文','By maritoguionyo / 3 scripts' if en else '作者 maritoguionyo / 3 个脚本文件','Bundled' if en else '已内置')
         row(v,'HotCoffee + Zombies' if en else '热咖啡 + 丧尸','By Je11yb0ne / CinnamonCoffee','Bundled' if en else '已内置')
@@ -119,7 +119,7 @@ def main():
             if kind=='empty':v.row_count=0;v.section=1;s.section=1;v.buttons[0].disabled=1
             else:
                 v.dialog=1 if kind=='confirm' else 2;v.dialog_title=u('Confirm installation?' if en else '确认安装此模组？')
-                v.dialog_body=u('MEGATARD v1.0.5\nTarget: update2.rpf / script_rel.rpf\n\nThis replaces same-name game scripts. Conflict detection and verification run automatically.\n\nKeep a complete archive backup and restart the game afterwards.' if en else 'MEGATARD v1.0.5（支持中文）\n目标：update2.rpf / script_rel.rpf\n\n安装会覆盖同名游戏脚本。互斥检测与回读校验自动执行。\n\n请先保留完整 RPF 备份。完成后重启游戏生效。')
+                v.dialog_body=u('MEGATARD v1.0.5\nTarget: update2.rpf / script_rel.rpf\n\nThis replaces same-name game scripts. Conflict detection and verification run automatically.\n\nKeep a complete archive backup and restart the game afterwards.' if en else 'MEGATARD v1.0.5 中文恢复版\n目标：update2.rpf / script_rel.rpf\n\n安装会覆盖同名游戏脚本。互斥检测与回读校验自动执行。\n\n请先保留完整 RPF 备份。完成后重启游戏生效。')
             lib.ui_render(c.byref(canvas),c.byref(s),c.byref(v));image.save(out/(kind+('-en' if en else '-zh')+'.png'))
     print('Rendered 18 previews using source/ui.c with sample data.')
 

@@ -974,9 +974,9 @@ typedef struct {
 } GcBuiltinModDef;
 
 static const GcBuiltinModDef S_MODS[] = {
-    { "megatard",  "MEGATARD v1.0.5（支持中文）", "MEGATARD v1.0.5 (multilingual)", "MEGATARD",
-      "菜单设置可切换中文；与经典 ragemenu 共用槽位，安装会替换",
-      "Chinese available in menu settings; replaces Classic ragemenu in the same slot",
+    { "megatard",  "MEGATARD v1.0.5 中文恢复版", "MEGATARD v1.0.5 (Chinese restored)", "Geekmaxxer",
+      "Settings → Language 选择 Chinese / 简体中文，按 A 保存；替换经典版",
+      "Settings > Language > Chinese / 简体中文, A to save; replaces Classic ragemenu",
       MF_MEGATARD,  MF_N(MF_MEGATARD) },
     { "classic",   "经典 ragemenu 简体 10月7日版", "Classic ragemenu Oct 7 (ZH)", "maritoguionyo",
       "替换英文版 / MEGATARD，并恢复官方 shop_controller",

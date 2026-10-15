@@ -21,6 +21,12 @@ SD卡:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf    （约 7
 
 工具内的「还原官方脚本」只还原 3 个脚本条目，**不能替代完整备份**。
 
+## v7.2.2 MEGATARD 中文恢复
+
+- v1.0.5 内保留中文译文，但原来的语言入口和翻译分发不再启用中文。本版补回 **Chinese / 简体中文**，复用原有中文译文，保留原有六种语言及其编号。
+- 在工具箱「脚本模组 → 内置模组」重新安装 **MEGATARD v1.0.5 中文恢复版**，重启游戏，按 **L + 十字键下** 呼出菜单；进入 **Settings → Language**，选 **Chinese / 简体中文** 后按 **A**。选择沿用原有存储方式保存。
+- 中文恢复使用可复现的脚本补丁，范围和原始文件哈希见 [中文恢复说明](docs/MEGATARD.zh.md)。39 项字节码检查覆盖翻译、七个语言选项、保存和重新读取；游戏内显示与真实存档仍待实机验证。
+
 ## v7.2.1 摇杆与侧栏焦点
 
 - 摇杆触发死区从 4000 提高至 12000，回中释放阈值为 8000，长按首次连移等待 450 ms，之后每 180 ms 移动一次。斜向输入选择主方向，减少焦点抖动；两个摇杆使用相同规则。
@@ -36,7 +42,7 @@ SD卡:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf    （约 7
 
 ## v7.1 电台与内置模组
 
-- MEGATARD 更新至 v1.0.5，支持中文和菜单语言切换，采用上游的三个脚本文件。
+- MEGATARD 更新至 v1.0.5，采用上游的三个脚本文件；v7.2.2 补回中文入口与翻译分发。
 - 新增 **经典 ragemenu 原版英文**，作者 **maritoguionyo**，由用户提供原始 `ragemenu.nsc`。与经典汉化版、MEGATARD 共用槽位；选择安装会替换当前版本。经典版安装同时恢复官方 `shop_controller.nsc`，清理 MEGATARD 的对应脚本。
 - 侧栏新增「电台」：自定义电台、替换原电台、使用说明。提供来源哈希检查、目标内容检查、备份、还原和中断恢复。
 - **未内置 Self Radio 运行包**，NRO 单独安装不会启用电台。作者 v1.1 下载目录检查时为空；取得匹配运行包后，按 [电台说明](docs/RADIO.zh.md) 准备安装包。
@@ -87,7 +93,7 @@ PC 格式会明确标记并阻止直接导入；请先完成 Switch 格式转换
 
 | 模组 | 作者 | 槽位 |
 |---|---|---|
-| MEGATARD v1.0.5（支持中文） | MEGATARD / Geekmaxxer 分支提供 | ragemenu |
+| MEGATARD v1.0.5 中文恢复版 | Geekmaxxer（本工具箱恢复中文） | ragemenu |
 | 经典 ragemenu 原版英文 | maritoguionyo | ragemenu |
 | 经典 ragemenu 简体 10月7日版 | maritoguionyo | ragemenu（与上互斥） |
 | 热咖啡+丧尸 | Je11yb0ne/CinnamonCoffee | simple_zombies |

@@ -74,7 +74,7 @@ Exiting with + does not automatically write unsaved changes.
 
 | Mod | Author | Slot |
 |---|---|---|
-| MEGATARD v0.9.9 (ZH) | Geekmaxxer | ragemenu |
+| MEGATARD v1.0.5 (Chinese restored) | Geekmaxxer | ragemenu |
 | Classic ragemenu v13 (ZH) | maritoguionyo | ragemenu (mutually exclusive with the above) |
 | Hot Coffee + Zombies | Je11yb0ne/CinnamonCoffee | simple_zombies |
 | Hot Coffee (no zombies) | Je11yb0ne/CinnamonCoffee | simple_zombies (mutually exclusive with the above) |
@@ -96,7 +96,7 @@ from hbmenu.
 ## Credits
 
 - **[Geekmaxxer](https://github.com/Geekmaxxer)** — [MEGATARD GTA5-NX Menu SDK](https://github.com/Geekmaxxer/GTA5NX-MG-Menu)
-  (author of MEGATARD v0.9.9), the [GTA5-NX-Tutorial](https://geekmaxxer.github.io/GTA5-NX-Tutorial/)
+  (author of MEGATARD v1.0.5), the [GTA5-NX-Tutorial](https://geekmaxxer.github.io/GTA5-NX-Tutorial/)
   site, and [RPF Radio Editor](https://github.com/Geekmaxxer/gta-radio-editor)
 - **[Je11yb0ne](https://github.com/Je11yb0ne)** — [HotCoffee-NX](https://github.com/Je11yb0ne/HotCoffee-NX)
   (the Switch port of CinnamonCoffee, with and without zombies)
@@ -107,7 +107,7 @@ from hbmenu.
 
 ## v7.1 radio and mod update
 
-MEGATARD v1.0.5 supports Chinese through its menu language setting. Classic ragemenu (original English) by **maritoguionyo** is also bundled from the user-supplied file. Installing either classic version replaces the shared menu/loader and restores stock shop_controller, removing the corresponding MEGATARD replacement.
+MEGATARD v1.0.5 is bundled; v7.2.2 restores its disabled Chinese language option and translation dispatch. Classic ragemenu (original English) by **maritoguionyo** is also bundled from the user-supplied file. Installing either classic version replaces the shared menu/loader and restores stock shop_controller, removing the corresponding MEGATARD replacement.
 
 The new Radio workspace installs verified Self Radio packages or paired Radio Editor outputs, with backups, restore and interruption recovery. **The Self Radio runtime is not bundled**: the author's v1.1 download folder was empty when checked. Obtain its matching HARD runtime and release-verification.json separately; use tools/export_package.py to prepare it. See docs/RADIO.zh.md for paths and commands. This build requires console testing.
 
@@ -120,3 +120,9 @@ DLC folders load in bounded batches, with cached reentry and visible-item resour
 ## v7.2.1 stick and sidebar focus
 
 Stick activation dead zone increases from 4000 to 12000, with release hysteresis at 8000 and dominant-axis filtering. Holding waits 450 ms before repeating at 180 ms intervals; both sticks follow the same rule. B still enters the sidebar and A still opens a page, retaining sidebar focus. Press Right explicitly to enter the content area. Pressing A on the active page does not reload it.
+
+## v7.2.2 MEGATARD Chinese restoration
+
+Reinstall **MEGATARD v1.0.5 (Chinese restored)** from Script mods > Built-in mods, then restart the game. Open the menu with **L + D-pad down**, choose **Settings > Language > Chinese / 简体中文**, and press **A** to apply and save.
+
+This reproducible bytecode patch reuses the Chinese translations retained in the original v1.0.5 file. It appends Chinese as language ID 6, preserves the six existing IDs, and extends the original persistence bounds. All 39 language checks pass with captured drawing/stat fixtures; console rendering and actual game persistence remain unverified. See [patch details and hashes](docs/MEGATARD.zh.md).
