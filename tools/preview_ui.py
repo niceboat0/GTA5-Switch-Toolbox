@@ -70,8 +70,9 @@ def fixture(page,en):
         for n,t in [('4%','序章初入洛圣都'),('20%','崔佛登场'),('31.6%','佩立托银行前夕'),('61.1%','终局大干一票'),('100%','完美全通关')]:row(v,n+' Story progress' if en else n+' '+t,'Write to the selected target slot' if en else '确认后写入当前目标槽位','Bundled' if en else '内置')
         buttons(v,['Write selected','Refresh','Save pending'] if en else ['写入所选','刷新列表','保存待写入修改']);v.buttons[2].disabled=1
     else:
+        v.section_count=2;v.sections[0]=u('Parameters' if en else '参数调整');v.sections[1]=u('Diagnostics' if en else '维护诊断')
         for name,value in [('Vehicle pool','256'),('Pedestrian pool','200'),('Streaming budget','512'),('Traffic density','100')]:row(v,name,'gameconfig.xml / 0 ~ 1024',value)
-        buttons(v,['Write changes','Restore stock','Diagnose paths','Verify','Reload'] if en else ['写入参数','恢复原版','路径自检','回读校验','重新载入']);v.buttons[0].disabled=1
+        buttons(v,['Write changes','Decrease','Increase','Restore stock','Diagnose paths'] if en else ['写入参数','减小数值','增大数值','恢复原版','路径自检']);v.buttons[0].disabled=1
     return v
 
 def main():

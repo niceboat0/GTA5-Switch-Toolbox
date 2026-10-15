@@ -14,6 +14,7 @@
 #include <zlib.h>          /* ★ v6: 性能调参页需要 deflate */
 
 #include "save.h"
+#include "save_backup.h"
 #include "gc_rpf.h"
 #include "gc_dlc.h"
 #include "gc_script.h"   /* ★ v5.0: 脚本 mod（.nsc）安装 */
@@ -1012,43 +1013,30 @@ static void ensure_dir(const char *dir) {
 
 /* 自动时间戳备份 (保存在 /switch/gta5save/<时间戳>/) */
 static int backup_current_save_timestamp(const char *reason) {
-    if (!g_save_buf || g_save_sz == 0) return 0;
-
-    time_t now = time(NULL);
-    struct tm *tm_info = localtime(&now);
-    char time_str[64];
-    if (tm_info) {
-        strftime(time_str, sizeof(time_str), "%Y%m%d_%H%M%S", tm_info);
-    } else {
-        snprintf(time_str, sizeof(time_str), "backup_%" PRIu64, (uint64_t)now);
+    if (!g_save_path[0]) return 0;
+    time_t now=time(NULL);
+    struct tm *tm_info=localtime(&now);
+    char stamp[64],backup_dir[512],destination[640];
+    if(tm_info) strftime(stamp,sizeof(stamp),"%Y%m%d_%H%M%S",tm_info);
+    else snprintf(stamp,sizeof(stamp),"backup_%" PRIu64,(uint64_t)now);
+    struct stat st;
+    int unique=0;
+    for(int i=0;i<1000;i++) {
+        snprintf(backup_dir,sizeof(backup_dir),"sdmc:/switch/gta5save/%s_%03d",stamp,i);
+        if(stat(backup_dir,&st)!=0) {unique=1;break;}
     }
-
-    char backup_dir[512];
-    snprintf(backup_dir, sizeof(backup_dir), "sdmc:/switch/gta5save/%s", time_str);
+    if(!unique) return 0;
     ensure_dir(backup_dir);
-
-    const char *fname = strrchr(g_save_path, '/');
-    if (fname) fname++;
-    else fname = "SGTA50000";
-
-    char dest_file[512];
-    snprintf(dest_file, sizeof(dest_file), "%s/%s", backup_dir, fname);
-
-    FILE *fp = fopen(dest_file, "wb");
-    if (fp) {
-        fwrite(g_save_buf, 1, g_save_sz, fp);
-        fclose(fp);
-
-        char info_path[512];
-        snprintf(info_path, sizeof(info_path), "%s/info.txt", backup_dir);
-        FILE *ifp = fopen(info_path, "w");
-        if (ifp) {
-            fprintf(ifp, "%s | %s | %s | %s\n", time_str, reason, fname, g_current_title);
-            fclose(ifp);
-        }
-        return 1;
-    }
-    return 0;
+    const char *name=strrchr(g_save_path,'/');name=name?name+1:g_save_path;
+    snprintf(destination,sizeof(destination),"%s/%s",backup_dir,name);
+    /* The loaded buffer may already contain a selected preset or backup. Copy
+     * the actual disk target so the player's previous save remains recoverable. */
+    if(save_backup_copy(g_save_path,destination)!=0) return 0;
+    if(R_FAILED(fsdevCommitDevice("sdmc"))) return 0;
+    char info_path[640];snprintf(info_path,sizeof(info_path),"%s/info.txt",backup_dir);
+    FILE *fp=fopen(info_path,"w");
+    if(fp) {fprintf(fp,"%s | %s | %s\n",stamp,reason,name);fclose(fp);}
+    return 1;
 }
 
 /* 扫描指定目录下的所有存档槽位并按修改时间倒序排列 (最新在前) */
@@ -1806,6 +1794,7 @@ static int parse_and_decrypt_buffer(void) {
 
     /* 记录每位角色 7 项技能的行为统计偏移与当前值 (用于UI显示与保存写入) */
     for (int i = 0; i < 3; i++) {
+        int sp_idx = CHAR_SP_INDEX[i];
         for (int k = 1; k < 8; k++) {   /* 技能 1~7 (特殊能力 8 不参与重算) */
             for (int f = 0; f < SKILL_BEHAVIOR_CNT; f++) {
                 const BehaviorField *bf = &SKILL_BEHAVIORS[k][sp_idx][f];
@@ -1988,7 +1977,12 @@ static int save_to_disk(void) {
     if (!g_is_plain || !g_save_buf) return -1;
 
     /* 仅在点击保存前做一次时间戳留底备份 */
-    backup_current_save_timestamp(TR("保存前备份", "backup before save"));
+    if (!backup_current_save_timestamp(TR("保存前备份", "backup before save"))) {
+        snprintf(g_status_msg,sizeof(g_status_msg),TR("备份当前槽位失败，已取消写入。请检查 SD 卡空间与目录权限。",
+            "Could not back up the current slot. Write cancelled. Check SD space and folder permissions."));
+        g_status_color=C_RED;
+        return -1;
+    }
 
     /* 将三位角色当前的所有修改回写到解密内存缓冲区 */
     for (int i = 0; i < 3; i++) {
@@ -4257,9 +4251,7 @@ int main(int argc, char **argv) {
             if(g_ui_dialog==2) {
                 if(keys&UI_UP) {if(g_ui_report_scroll>0) g_ui_report_scroll--;}
                 if(keys&UI_DOWN) {
-                    /* Bounded by text length; paragraph wrapping also handles long paths. */
-                    int max_scroll=(int)strlen(g_ui_dialog_body)/32;
-                    if(g_ui_report_scroll<max_scroll) g_ui_report_scroll++;
+                    if(g_ui_report_scroll<g_ui_report_max) g_ui_report_scroll++;
                 }
             }
             UiEvent e=ui_input(&g_ui,&g_view,keys);
@@ -4273,10 +4265,10 @@ int main(int argc, char **argv) {
         adjust_dir=dir;
         if(adjust && !g_ui_dialog && !g_view.dialog && g_ui.focus==UI_LIST) {
             if(g_ui.page==UI_GRAPHICS && g_ui.section==1) modern_execute(modern_event(U_GFX_STEP,adjust),0);
-            else if(g_ui.page==UI_ADVANCED) modern_execute(modern_event(U_PERF_STEP,adjust),0);
+            else if(g_ui.page==UI_ADVANCED && g_ui.section==0) modern_execute(modern_event(U_PERF_STEP,adjust),0);
         }
         if(!g_ui_running) break;
-        modern_build();
+        if(keys || touched || adjust || down) modern_build();
         u32 stride=0;
         uint32_t *pixels=framebufferBegin(&fb,&stride);
         if(!pixels) continue;

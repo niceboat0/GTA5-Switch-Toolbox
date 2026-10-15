@@ -14,12 +14,13 @@ enum {
 };
 static UiState g_ui;
 static UiView g_view;
-static int g_ui_running=1, g_ui_dialog=0, g_ui_report_scroll=0;
+static int g_ui_running=1, g_ui_dialog=0, g_ui_report_scroll=0, g_ui_report_max=0;
 static UiEvent g_ui_pending;
 static char g_ui_dialog_title[160],g_ui_dialog_body[8192],g_ui_summary[256];
 static const int UI_GFX_ORDER[]={2,4,3,5,0,1};
 
 static UiEvent modern_event(int action,int param) { UiEvent e={action,param};return e; }
+static int modern_measure(void *ctx,const char *str,int size);
 static void modern_copy(char *out,size_t len,const char *s) { snprintf(out,len,"%s",s?s:""); }
 static UiRow *modern_row(const char *title,const char *sub,const char *badge,
                          const char *note,int action,int param,uint32_t tone,int disabled) {
@@ -38,6 +39,8 @@ static void modern_dialog(int type,const char *title,const char *body,UiEvent pe
     g_ui_dialog=type;g_ui_pending=pending;g_ui_report_scroll=0;
     modern_copy(g_ui_dialog_title,sizeof(g_ui_dialog_title),title);
     modern_copy(g_ui_dialog_body,sizeof(g_ui_dialog_body),body);
+    UiCanvas metrics={NULL,NULL,NULL,modern_measure,NULL};
+    g_ui_report_max=ui_report_max_scroll(&metrics,g_ui_dialog_body);
     
 }
 static void modern_report(const char *title,const char *body) {
@@ -50,7 +53,12 @@ static void modern_sync(void) {
         if(g_dlc_view) g_dlc_src_sel=g_ui.selected; else g_dlc_sel=g_ui.selected;
     }
     if(g_ui.page==UI_GRAPHICS && g_ui.section==1) g_gfx_cur_idx=g_ui.selected;
-    if(g_ui.page==UI_ADVANCED) g_gc_knob=g_ui.selected;
+    if(g_ui.page==UI_ADVANCED && g_ui.section==0) g_gc_knob=g_ui.selected;
+}
+static void modern_scan_saves(void) {
+    scan_backup_history();
+    if(g_save_dir[0]) scan_save_slots(g_save_dir);
+    for(int i=0;i<g_num_slots;i++) if(strcmp(g_slots[i].fullpath,g_save_path)==0) {g_active_slot_idx=i;break;}
 }
 static void modern_enter(int page,int section) {
     if(page<0 || page>=UI_PAGE_COUNT) return;
@@ -58,7 +66,7 @@ static void modern_enter(int page,int section) {
     if(page==UI_MODS) {g_tab=TAB_SCRIPT;g_dlc_msg[0]=0;script_scan();}
     else if(page==UI_DLC) {g_tab=TAB_DLC;g_dlc_msg[0]=0;dlc_reload();dlc_scan_src();}
     else if(page==UI_GRAPHICS) {g_tab=TAB_GFX;if(!g_gfx_count) gfx_load();scan_switch_gfx_files();}
-    else if(page==UI_SAVES) {g_tab=TAB_TOOL;scan_backup_history();if(g_save_dir[0]) scan_save_slots(g_save_dir);}
+    else if(page==UI_SAVES) {g_tab=TAB_TOOL;modern_scan_saves();}
     else if(page==UI_ADVANCED) {g_tab=TAB_PERF;if(!g_gc_opened) gc_open_rpf();}
     else g_tab=TAB_TOOL;
     modern_sync();
@@ -183,8 +191,9 @@ static void modern_build(void) {
         g_view.status=g_ui_summary;g_view.status_tone=no_target?UI_ERROR:g_status_color;
     } else {
         g_view.title=TR("高级工具","Advanced tools");g_view.subtitle=TR("gameconfig 参数与诊断。参数调整不会自动提升硬件性能。","Gameconfig parameters and diagnostics. Changes cannot remove hardware limits.");
-        g_view.primary=TR("ZL / ZR  调整数值","ZL / ZR  Adjust value");g_view.dirty=g_gc_dirty;
-        if(g_gc_opened) for(int i=0;i<GC_NUM_KNOB_META;i++) {
+        g_view.section_count=2;g_view.sections[0]=TR("参数调整","Parameters");g_view.sections[1]=TR("维护诊断","Diagnostics");
+        g_view.primary=g_ui.section?TR("A  执行所选操作","A  Run selected action"):TR("ZL / ZR  调整数值","ZL / ZR  Adjust value");g_view.dirty=g_gc_dirty;
+        if(g_gc_opened && !g_ui.section) for(int i=0;i<GC_NUM_KNOB_META;i++) {
             const GcKnobMeta *m=&GC_KNOB_META[i];int cur=gc_get_edited(m->key),edited=cur!=INT32_MIN;char sub[192],value[48];
             if(!edited && gc_xml_get_int((char*)g_gc_xml,g_gc_xml_len,g_gc_sw_a,g_gc_sw_b,m->key,&cur)!=GC_OK && gc_xml_get_int((char*)g_gc_xml,g_gc_xml_len,g_gc_any_a,g_gc_any_b,m->key,&cur)!=GC_OK) cur=0;
             snprintf(sub,sizeof(sub),"%s  /  %d ~ %d",m->key,m->lo,m->hi);snprintf(value,sizeof(value),"%d%s",cur,edited?" *":"");
@@ -193,11 +202,18 @@ static void modern_build(void) {
         }
         g_view.empty_title=TR("无法读取 update.rpf","Could not read update.rpf");g_view.empty_body=TR("检查游戏文件是否位于正确目录。选择「路径自检」查看具体原因。","Check the game file location. Choose Diagnose paths to see the details.");
         g_view.empty_path="/atmosphere/contents/0100b00b51230000/romfs/update/";
-        modern_button(TR("写入参数","Write changes"),U_PERF_WRITE,0,!g_gc_opened || !g_gc_dirty,0);
-        modern_button(TR("恢复原版","Restore stock"),U_PERF_RESTORE,0,!g_gc_opened,0);
-        modern_button(TR("路径自检","Diagnose paths"),U_PERF_CHECK,0,0,0);
-        modern_button(TR("回读校验","Verify"),U_PERF_VERIFY,0,!g_gc_opened,0);
-        modern_button(TR("重新载入","Reload"),U_PERF_LOAD,0,0,0);
+        if(!g_ui.section) {
+            modern_button(g_gc_opened?TR("写入参数","Write changes"):TR("载入文件","Load file"),g_gc_opened?U_PERF_WRITE:U_PERF_LOAD,0,g_gc_opened && !g_gc_dirty,0);
+            modern_button(TR("减小数值","Decrease"),U_PERF_STEP,-1,!g_gc_opened,0);
+            modern_button(TR("增大数值","Increase"),U_PERF_STEP,1,!g_gc_opened,0);
+            modern_button(TR("恢复原版","Restore stock"),U_PERF_RESTORE,0,!g_gc_opened,0);
+            modern_button(TR("路径自检","Diagnose paths"),U_PERF_CHECK,0,0,0);
+        } else {
+            modern_row(TR("路径自检","Diagnose paths"),TR("检查候选游戏目录与 RPF 文件","Inspect candidate game folders and RPF archives"),TR("只读","Read-only"),"",U_PERF_CHECK,0,UI_ACCENT,0);
+            modern_row(TR("回读校验","Verify on disk"),TR("比较当前编辑内容与磁盘实际数据","Compare edited parameters with actual disk contents"),TR("只读","Read-only"),"",U_PERF_VERIFY,0,UI_ACCENT,!g_gc_opened);
+            modern_row(TR("重新载入","Reload parameters"),TR("重新从 update.rpf 读取参数","Read parameters from update.rpf again"),TR("读取","Read"),"",U_PERF_LOAD,0,UI_ACCENT,0);
+            modern_button(TR("执行所选","Run selected"),UI_RUN_ROW,0,g_view.rows[g_ui.selected<g_view.row_count?g_ui.selected:0].disabled,0);
+        }
         g_view.status=g_gc_msg;g_view.status_tone=g_gc_msg_color;
     }
     ui_clamp(&g_ui,&g_view);modern_sync();
@@ -277,13 +293,13 @@ static void modern_execute(UiEvent e,int confirmed) {
     case U_SAVE_BACKUP: if(load_backup_save(e.param)==0) save_to_disk();break;
     case U_SAVE_SLOT: if(g_dirty) {modern_report(TR("请先保存待写入修改","Save pending changes first"),TR("当前存档有未写入修改。先选择「保存待写入修改」，再切换槽位。","The current save has pending changes. Choose Save pending before switching slots."));} else switch_to_slot(e.param);break;
     case U_SAVE_WRITE: save_to_disk();break;
-    case U_SAVE_REFRESH: if(g_ui.page==UI_GRAPHICS) {scan_switch_gfx_files();if(!g_gfx_dirty) gfx_load();} else {scan_backup_history();if(g_save_dir[0]) scan_save_slots(g_save_dir);}break;
+    case U_SAVE_REFRESH: if(g_ui.page==UI_GRAPHICS) {scan_switch_gfx_files();if(!g_gfx_dirty) gfx_load();} else modern_scan_saves();break;
     case U_PERF_LOAD: if(g_gc_dirty && !confirmed) modern_report(TR("请先保存参数","Save parameters first"),TR("当前有参数修改，请先写入后再载入。","Write pending parameter changes before reloading."));else if(g_gc_opened) gc_reload_from_disk();else gc_open_rpf();break;
     case U_PERF_WRITE: gc_write_to_rpf();break;
     case U_PERF_RESTORE: if(gc_restore_original()==GC_OK) gc_write_to_rpf();break;
     case U_PERF_CHECK: gc_rpf_selftest(out,sizeof(out));modern_report(TR("路径自检报告","Path diagnostics"),out);break;
     case U_PERF_VERIFY: gc_verify_on_disk();modern_report(TR("参数回读校验","Parameter verification"),g_gc_selftest);break;
-    case U_PERF_STEP: if(g_gc_opened) gc_knob_step(e.param);break;
+    case U_PERF_STEP: if(g_gc_opened && g_ui.section==0) gc_knob_step(e.param);break;
     case U_EXIT: g_ui_running=0;break;
     default: break;
     }

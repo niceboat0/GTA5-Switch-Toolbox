@@ -61,8 +61,9 @@ in memory until Save changes. Import XML scans `/switch/gta5save/`. High graphic
 extreme overclocking; actual performance depends on the device.
 
 **Saves & backups:** Story saves, historical backups and the target slot are visible categories.
-The confirmation shows the target path. Confirming loads and writes the selected save using the
-existing backup-before-write flow. Switching slots does not immediately overwrite a save.
+The confirmation shows the target path. Confirming loads and writes the selected save after
+backing up the actual on-disk target. Backups within the same second use separate folders;
+backup failures cancel the write. Switching slots does not immediately overwrite a save.
 Writing is disabled without a readable target; create an in-game save first.
 
 **Advanced:** Manual gameconfig parameters, original defaults, diagnostics and read-back verification.

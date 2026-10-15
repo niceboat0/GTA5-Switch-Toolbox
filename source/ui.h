@@ -63,5 +63,6 @@ void ui_reset(UiState *, int page, int section);
 void ui_clamp(UiState *, const UiView *);
 UiEvent ui_input(UiState *, const UiView *, unsigned keys);
 void ui_render(const UiCanvas *, UiState *, const UiView *);
+int ui_report_max_scroll(const UiCanvas *, const char *);
 
 #endif

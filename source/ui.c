@@ -50,12 +50,9 @@ static void fit(const UiCanvas *c,int x,int y,int size,int width,const char *s,u
     if (*s && *s!='\n') { memcpy(b+n,"...",3); n+=3; }
     b[n]=0; text(c,x,y,size,b,col);
 }
-static void paragraph(const UiCanvas *c,int x,int y,int size,int width,int max_lines,
-                      const char *s,uint32_t col,int skip) {
-    if (!s) return;
-    for (int line=0;*s && line<max_lines+skip;line++) {
-        char b[768]; size_t n=0,last_space=0;int width_used=0;const char *resume=NULL;
-        while (*s && *s!='\n' && n+5<sizeof(b)) {
+static const char *next_line(const UiCanvas *c,const char *s,char b[768],int size,int width) {
+        size_t n=0,last_space=0;int width_used=0;const char *resume=NULL;
+        while (*s && *s!='\n' && n+5<768) {
             int k=next_char(s);char ch[5]={0};memcpy(ch,s,(size_t)k);
             int advance=c->measure(c->ctx,ch,size);
             if (width_used+advance>width && n) {
@@ -67,8 +64,21 @@ static void paragraph(const UiCanvas *c,int x,int y,int size,int width,int max_l
         }
         b[n]=0;
         if (*s=='\n') s++;
+        return s;
+}
+static void paragraph(const UiCanvas *c,int x,int y,int size,int width,int max_lines,
+                      const char *s,uint32_t col,int skip) {
+    if (!s) return;
+    for (int line=0;*s && line<max_lines+skip;line++) {
+        char b[768];s=next_line(c,s,b,size,width);
         if (line>=skip) text(c,x,y+(line-skip)*(size+9),size,b,col);
     }
+}
+int ui_report_max_scroll(const UiCanvas *c,const char *s) {
+    if(!s) return 0;
+    int lines=0;char b[768];
+    while(*s) {s=next_line(c,s,b,17,842);lines++;}
+    return lines>9?lines-9:0;
 }
 static void hit(const UiCanvas *c,int x,int y,int w,int h,int a,int p) {
     if (c->hit) c->hit(c->ctx,x,y,w,h,event(a,p));

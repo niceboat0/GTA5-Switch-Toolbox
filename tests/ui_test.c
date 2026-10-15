@@ -52,6 +52,8 @@ int main(void) {
     fixture(UI_MODS,5);ui_reset(&s,UI_MODS,0);s.selected=999;s.scroll=999;ui_clamp(&s,&view);assert(s.selected==4 && s.scroll==1);
     view.row_count=0;ui_clamp(&s,&view);assert(s.selected==0 && s.scroll==0);
     UiCanvas c={NULL,rect,text,measure,hit};
+    assert(ui_report_max_scroll(&c,"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11")==2);
+    assert(ui_report_max_scroll(&c,"Short report")==0);
     for(int page=0;page<UI_PAGE_COUNT;page++) for(int lang=0;lang<2;lang++) {
         fixture(page,page==UI_HOME?4:9);view.en=lang;ui_reset(&s,page,0);ui_render(&c,&s,&view);
         if(page) {view.row_count=0;ui_render(&c,&s,&view);}
