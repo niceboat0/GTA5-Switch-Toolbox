@@ -1,0 +1,31 @@
+name: Build and UI checks
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  ui-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and exercise platform independent UI
+        run: |
+          mkdir -p build
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g source/ui.c tests/ui_test.c -o build/ui-test
+          ./build/ui-test
+  switch:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkita64:20260219
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Nintendo Switch NRO
+        run: make -j2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gta5save-modern-ui
+          path: gta5save.nro
+          if-no-files-found: error
+          retention-days: 14
