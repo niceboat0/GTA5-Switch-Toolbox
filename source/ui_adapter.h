@@ -38,7 +38,7 @@ static void modern_dialog(int type,const char *title,const char *body,UiEvent pe
     g_ui_dialog=type;g_ui_pending=pending;g_ui_report_scroll=0;
     modern_copy(g_ui_dialog_title,sizeof(g_ui_dialog_title),title);
     modern_copy(g_ui_dialog_body,sizeof(g_ui_dialog_body),body);
-    g_tap_fx_on=0;
+    
 }
 static void modern_report(const char *title,const char *body) {
     modern_dialog(2,title,body,modern_event(0,0));
@@ -49,12 +49,12 @@ static void modern_sync(void) {
         g_dlc_view=g_ui.section;
         if(g_dlc_view) g_dlc_src_sel=g_ui.selected; else g_dlc_sel=g_ui.selected;
     }
-    if(g_ui.page==UI_GRAPHICS && g_ui.section==1) g_gfx_cur_idx=(char)g_ui.selected;
+    if(g_ui.page==UI_GRAPHICS && g_ui.section==1) g_gfx_cur_idx=g_ui.selected;
     if(g_ui.page==UI_ADVANCED) g_gc_knob=g_ui.selected;
 }
 static void modern_enter(int page,int section) {
     if(page<0 || page>=UI_PAGE_COUNT) return;
-    ui_reset(&g_ui,page,section);g_tap_fx_on=0;
+    ui_reset(&g_ui,page,section);
     if(page==UI_MODS) {g_tab=TAB_SCRIPT;g_dlc_msg[0]=0;script_scan();}
     else if(page==UI_DLC) {g_tab=TAB_DLC;g_dlc_msg[0]=0;dlc_reload();dlc_scan_src();}
     else if(page==UI_GRAPHICS) {g_tab=TAB_GFX;if(!g_gfx_count) gfx_load();scan_switch_gfx_files();}
@@ -68,7 +68,7 @@ static void modern_section(int section) {
     g_ui.section=section;g_ui.selected=0;g_ui.scroll=0;g_ui.button=0;g_ui.focus=UI_SECTIONS;
     if(g_ui.page==UI_DLC && section==1) dlc_scan_src();
     if(g_ui.page==UI_GRAPHICS && section==2) scan_switch_gfx_files();
-    modern_sync();g_tap_fx_on=0;
+    modern_sync();
 }
 static void modern_build(void) {
     memset(&g_view,0,sizeof(g_view));
@@ -150,7 +150,7 @@ static void modern_build(void) {
         g_view.section_count=3;g_view.sections[0]=TR("画质预设","Presets");g_view.sections[1]=TR("逐项调整","Fine-tune");g_view.sections[2]=TR("导入配置","Import XML");
         g_view.primary=g_ui.section==1?TR("ZL / ZR  调整数值","ZL / ZR  Adjust value"):TR("A  查看应用确认","A  Review application");g_view.dirty=g_gfx_dirty;
         if(g_ui.section==0) for(int i=0;i<(int)NUM_GFX_PRESETS;i++) {
-            int p=UI_GFX_ORDER[i];const GfxPreset *gp=&GFX_PRESET(p);
+            int p=UI_GFX_ORDER[i];const GfxPreset *gp=g_lang_en?&GFX_PRESETS_EN[p]:&GFX_PRESETS[p];
             modern_row(gp->name,gp->desc,p==2?TR("默频适用","Stock clocks"):p==5?TR("需超频","Overclock"):TR("预设","Preset"),gp->desc,U_GFX_PRESET,p,p==5?UI_WARN:UI_ACCENT,0);
         } else if(g_ui.section==1) for(int i=0;i<g_gfx_count;i++) {
             GfxItem *it=&g_gfx_items[i];modern_row(g_lang_en?it->name:it->cn,it->name,it->value,
@@ -206,6 +206,8 @@ static void modern_build(void) {
 
 static void modern_execute(UiEvent e,int confirmed) {
     modern_sync();
+    if(g_ui_dialog && e.action!=UI_DIALOG_OK && e.action!=UI_DIALOG_CANCEL) return;
+    if(e.action==UI_DIALOG_OK && g_ui_dialog!=1) return;
     if(e.action==UI_NO_EVENT) return;
     if(e.action==UI_GO_PAGE) {modern_enter(e.param,0);return;}
     if(e.action==UI_GO_SECTION) {modern_section(e.param);return;}
@@ -221,8 +223,10 @@ static void modern_execute(UiEvent e,int confirmed) {
         if(!g_view.row_count || g_view.rows[g_ui.selected].disabled) return;
         e=g_view.rows[g_ui.selected].event;
     }
-    if(e.action==UI_DIALOG_CANCEL) {g_ui_dialog=0;g_tap_fx_on=0;return;}
-    if(e.action==UI_DIALOG_OK) {e=g_ui_pending;g_ui_dialog=0;confirmed=1;g_tap_fx_on=0;}
+    if(e.action==UI_GO_PAGE) {modern_enter(e.param,0);return;}
+    if(e.action==UI_GO_SECTION) {modern_section(e.param);return;}
+    if(e.action==UI_DIALOG_CANCEL) {g_ui_dialog=0;return;}
+    if(e.action==UI_DIALOG_OK) {e=g_ui_pending;g_ui_dialog=0;confirmed=1;}
     int mutates=e.action==U_MOD_INSTALL||e.action==U_MOD_RESTORE||e.action==U_SCRIPT_INSTALL||e.action==U_SCRIPT_REMOVE||
         e.action==U_DLC_TOGGLE||e.action==U_DLC_IMPORT||e.action==U_DLC_DELETE||e.action==U_DLC_CONVERT||e.action==U_DLC_HD||
         e.action==U_GFX_PRESET||e.action==U_GFX_IMPORT||e.action==U_GFX_SAVE||e.action==U_SAVE_PRESET||e.action==U_SAVE_BACKUP||
@@ -237,7 +241,7 @@ static void modern_execute(UiEvent e,int confirmed) {
         if(e.action==U_PERF_RESTORE) effect=TR("恢复原版参数并写入 update.rpf。当前未写入的参数调整会被替换。","Restores original parameters and writes update.rpf, replacing pending parameter edits.");
         if(e.action==U_SAVE_PRESET||e.action==U_SAVE_BACKUP) effect=TR("载入所选存档并写入下方目标槽位，写入前执行现有自动备份流程。","Loads the selected save and writes the target slot below using the existing backup-before-save flow.");
         if(e.action==U_EXIT) effect=TR("仍有未写入的修改。确认退出会放弃这些修改；取消后可以继续保存。","There are unsaved changes. Confirming exits without writing them. Cancel to continue editing and save.");
-        snprintf(body,sizeof(body),"%s\n\n%s\n\n%s: %s\n\n%s",name,effect,TR("目标","Target"),target,
+        snprintf(body,sizeof(body),"%s\n%s: %s\n\n%s\n\n%s",name,TR("目标","Target"),target,effect,
             g_ui.page==UI_MODS||g_ui.page==UI_DLC||g_ui.page==UI_ADVANCED?TR("请先保留完整 RPF 备份。完成后重启游戏生效。","Keep a complete RPF backup. Restart the game afterwards."):TR("请检查所选内容与目标。","Check the selection and target before confirming."));
         modern_dialog(1,e.action==U_EXIT?TR("退出工具？","Exit toolbox?"):TR("确认此次修改？","Confirm this change?"),body,e);return;
     }
@@ -274,7 +278,7 @@ static void modern_execute(UiEvent e,int confirmed) {
     case U_SAVE_SLOT: if(g_dirty) {modern_report(TR("请先保存待写入修改","Save pending changes first"),TR("当前存档有未写入修改。先选择「保存待写入修改」，再切换槽位。","The current save has pending changes. Choose Save pending before switching slots."));} else switch_to_slot(e.param);break;
     case U_SAVE_WRITE: save_to_disk();break;
     case U_SAVE_REFRESH: if(g_ui.page==UI_GRAPHICS) {scan_switch_gfx_files();if(!g_gfx_dirty) gfx_load();} else {scan_backup_history();if(g_save_dir[0]) scan_save_slots(g_save_dir);}break;
-    case U_PERF_LOAD: if(g_gc_dirty && !confirmed) modern_report(TR("请先保存参数","Save parameters first"),TR("当前有参数修改，请先写入后再载入。","Write pending parameter changes before reloading."));else gc_open_rpf();break;
+    case U_PERF_LOAD: if(g_gc_dirty && !confirmed) modern_report(TR("请先保存参数","Save parameters first"),TR("当前有参数修改，请先写入后再载入。","Write pending parameter changes before reloading."));else if(g_gc_opened) gc_reload_from_disk();else gc_open_rpf();break;
     case U_PERF_WRITE: gc_write_to_rpf();break;
     case U_PERF_RESTORE: if(gc_restore_original()==GC_OK) gc_write_to_rpf();break;
     case U_PERF_CHECK: gc_rpf_selftest(out,sizeof(out));modern_report(TR("路径自检报告","Path diagnostics"),out);break;

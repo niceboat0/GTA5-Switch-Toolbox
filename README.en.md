@@ -23,68 +23,51 @@ Restoring them recovers everything:
 The in-tool "Restore stock scripts" only restores 3 script entries —
 **it is not a substitute for a full backup**.
 
-## Features (v6.2)
+## Features and controls (v7.0)
 
-- **DLC tab**: register/uninstall add-on vehicle DLCs (dual registration in
-  dlclist.xml + extratitleupdatedata.meta)
-- **Scripts tab**: install .nsc script mods (auto-detects official RSC7 format vs raw mod
-  format), one-tap stock script restore, 4 builtin mods with mutual-exclusion checks
-- **Graphics tab**: one-tap settings.xml presets (low/medium/high/extreme-OC)
-- **Perf tab**: gameconfig tuning (settled: the bottleneck is the Tegra X1 —
-  overclocking is the real fix)
-- **Tools tab**: 5 story progress saves (4% ~ 100%), info view
+Native 1280×720 interface with a fixed sidebar, overview, segmented libraries,
+selection details and one action bar. Chinese and English follow the system language.
+Controller and touch share the same actions. No extra UI libraries are required.
 
-## Usage
+Copy `gta5save.nro` to `/switch/` and launch it from hbmenu. Choose a workspace from
+Overview or the sidebar. Select an item, review its details, and confirm before writing.
 
-### Install & launch
+| Action | Controller | Touch |
+|---|---|---|
+| Switch workspace | L / R | Sidebar |
+| Select an item | D-pad or either stick up/down | Tap a row (selection only) |
+| Change category | Up from the first row, then left/right; Down enters the list | Category header |
+| Use the action bar | X, left/right, A; X or Up returns to the list | Tap a button |
+| Apply selection | A, then A on the confirmation | Primary button, then Confirm |
+| Adjust values | ZL / ZR in graphics fine-tuning or advanced parameters; hold to repeat | Decrease / Increase (graphics) |
+| Overview / cancel | B | Overview / Cancel |
+| Exit | +; unsaved changes require confirmation | — |
 
-1. Download `gta5save.nro` from Releases, copy it to `/switch/` on the SD card
-2. Game files must be at `atmosphere/contents/0100b00b51230000/romfs/`
-3. Launch via hbmenu (hold R while starting the game, or close the game and open hbmenu)
-4. In-tool: **L/R switch tabs**, D-pad to navigate, A confirm, B back/exit
+**Script mods:** Built-in mods, External scripts and Restore stock are separate categories.
+Select a bundled mod directly to install it. Put external `.nsc` files in
+`/switch/gta5save/script/` and Rescan. Existing conflict detection and read-back verification
+are preserved. In-game menu: **L + D-pad down** for MEGATARD/ragemenu;
+**B + D-pad right** for HotCoffee. Removing an entry does not automatically restore stock.
 
-### Scripts tab (core feature)
+**DLC library:** Installed handles registration, conversion, HD-texture hiding and deletion.
+Ready to import scans folders containing `dlc.rpf` under `/switch/gta5save/dlc/`.
+Installed packs live under
+`/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/`.
+PC-format packs are labelled and blocked from direct import. Convert them to Switch format first.
+Inspect opens the resource report.
 
-**Install a builtin mod**: pick "*Mod Mgr" → a submenu opens (3 stock restore entries +
-4 builtin mods) → select one → it lists the RPF entries it will overwrite → confirm.
-Mutually exclusive mods (e.g. the two ragemenu-based ones) are flagged before install.
+**Graphics:** Presets open by default with stock-clock choices first. Fine-tuning changes stay
+in memory until Save changes. Import XML scans `/switch/gta5save/`. High graphics require
+extreme overclocking; actual performance depends on the device.
 
-**Install external mods**: put .nsc files into `/switch/gta5save/script/` on the SD card
-(auto-created on first visit; dropping them directly in `/switch/gta5save/` also works),
-then select one in the list and press A. Both official (RSC7) and raw mod formats are
-auto-detected.
+**Saves & backups:** Story saves, historical backups and the target slot are visible categories.
+The confirmation shows the target path. Confirming loads and writes the selected save using the
+existing backup-before-write flow. Switching slots does not immediately overwrite a save.
+Writing is disabled without a readable target; create an in-game save first.
 
-**Restore stock**: in Mod Mgr, pick a stock script (error_listener /
-achievement_controller / shop_controller) and restore it individually.
-
-**In-game mod menu hotkeys**: after installing, press **L + D-pad Down** (MEGATARD/ragemenu)
-or **B + D-pad Right** (Hot Coffee) in game.
-
-### DLC tab
-
-**Directories**:
-- **Installed** (read by the game): `/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/`
-- **Pending import** (drop dlcpack folders here): `/switch/gta5save/dlc/` (recommended).
-  Also scanned: `/switch/gta5save/`, `/switch/GTA5DLC/`, `/dlc/`, `/gta5dlc/`, `/switch/`
-
-**How to**: put the ported dlcpack folder (containing `dlc.rpf`) into the import folder,
-press **Y** on the DLC tab to switch to "Pending", select and press **A** to import
-(auto-copies to dlcpacks/ + registers in dlclist.xml + extratitleupdatedata.meta).
-PC-format packs are auto-converted on import; packs flagged "will crash" should not be
-imported directly. Add one pack at a time and reboot to verify.
-
-### Graphics tab
-
-Select a preset and press A to apply the settings.xml:
-- **Low (stock clocks)**: for non-overclocked consoles
-- **Medium (default)**: balanced choice after overclocking
-- **High (extreme OC only)**: CPU 1963 / GPU 768 / RAM 2666 and above
-- **VSync off variants**: aggressive framerate-first options
-
-### Tools tab
-
-- **Builtin saves**: press ZL, 5 progress levels (4% / 20% / 31.6% / 61.1% / 100%)
-- **Info**: current mod status, RPF free space, etc.
+**Advanced:** Manual gameconfig parameters, original defaults, diagnostics and read-back verification.
+Writes and restoration require confirmation. Reports scroll with Up/Down.
+Exiting with + does not automatically write unsaved changes.
 
 ## Builtin mods (romfs/builtin_mods/)
 

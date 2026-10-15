@@ -49,7 +49,7 @@ int main(void) {
     e=ui_input(&s,&view,UI_ACCEPT);assert(e.action==2000);
     fixture(UI_HOME,4);ui_reset(&s,UI_HOME,0);ui_input(&s,&view,UI_RIGHT|UI_DOWN);assert(s.selected==3);
     e=ui_input(&s,&view,UI_ACCEPT);assert(e.param==3);
-    fixture(UI_MODS,5);ui_reset(&s,UI_MODS,0);s.selected=999;s.scroll=999;ui_clamp(&s,&view);assert(s.selected==4 && s.scroll==4);
+    fixture(UI_MODS,5);ui_reset(&s,UI_MODS,0);s.selected=999;s.scroll=999;ui_clamp(&s,&view);assert(s.selected==4 && s.scroll==1);
     view.row_count=0;ui_clamp(&s,&view);assert(s.selected==0 && s.scroll==0);
     UiCanvas c={NULL,rect,text,measure,hit};
     for(int page=0;page<UI_PAGE_COUNT;page++) for(int lang=0;lang<2;lang++) {

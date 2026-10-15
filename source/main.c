@@ -28,27 +28,6 @@
 /* GTA V Switch 版 Title ID */
 #define GTAV_TITLE_ID 0x0100B00B51230000ULL
 
-/* ========================================================================= */
-/* ★ v5: 统一布局常量 -- 全部区块的 y 区间由这里定义, 杜绝魔数散落造成重叠     */
-/* ========================================================================= */
-#define LY_PAD        40                      /* 左右安全边距 */
-#define LY_HEADER_Y   0
-#define LY_HEADER_H   62
-#define LY_INFO_Y     66
-#define LY_INFO_H     42
-/* ★ v6.1 (2026-10-01): 顶部「角色标签栏」条带已废弃 —— 它只服务于已移除的
- *   「存档修改」页（渲染块已整块删除）⇒ 112..150 这 44px 永远空白。
- *   现把该条带回收给内容区：LY_BODY_Y 从 156 上提到 112，LY_BODY_H 从 420 增至 464。
- *   （LY_CTAB_* 常量已删除，无残留引用。） */
-#define LY_BODY_Y     112                     /* ★ v6.1: 156 -> 112（吸收废弃条带）*/
-#define LY_BODY_H     464                     /* ★ v6.1: 420 -> 464（+44）*/
-#define LY_BTN_Y      584                     /* 统一按钮栏 584..632 */
-#define LY_BTN_H      48
-#define LY_HINT_Y     640                     /* 提示行 640..676 */
-#define LY_BODY_BOT   (LY_BODY_Y + LY_BODY_H) /* = 576（与按钮栏仍留 8px 间隙）*/
-/* 内容区右边界 (给右侧滚动条留 22px) */
-#define LY_CONTENT_R  (FB_WIDTH - LY_PAD - 22)   /* = 1218 */
-
 /* 界面主题配色 (深色典雅，无 Emoji 干净排版) */
 /* ★★★ v28e 关键修正：本工程 framebuffer = PIXEL_FORMAT_RGBA_8888，
  *   其像素 u32 的内存序是 0xAABBGGRR（R 在【低字节】，与 PC 常见的 BGRA 相反）。
@@ -113,73 +92,6 @@ void detect_language(void) {
  *   下一帧处理输入时，用触摸点做命中测试，转换成与按键等价的「动作」。
  *   这样按键与触屏共用同一套动作处理逻辑，不会出现两套行为。 */
 
-/* 统一动作枚举 */
-typedef enum {
-    ACT_NONE = 0,
-    /* 导航 */
-    ACT_NAV_LEFT, ACT_NAV_RIGHT, ACT_NAV_UP, ACT_NAV_DOWN,
-    /* 页签 */
-    ACT_TAB_SAVE, ACT_TAB_GFX, ACT_TAB_TOOL, ACT_TAB_PERF, ACT_TAB_DLC,
-    ACT_TAB_SCRIPT,       /* ★ v5.5: 脚本 mod 独立页签 */
-    /* 通用 */
-    ACT_CONFIRM, ACT_BACK,
-    /* ★ 底部大号 −/+ */
-    ACT_BIG_MINUS, ACT_BIG_PLUS,
-    /* 功能 */
-    ACT_MAX_ALL,          /* 拉满当前项 */
-    ACT_MAX_CHAR,         /* 当前角色全满 */
-    ACT_CYCLE_STEP,       /* 切换步长 */
-    ACT_SAVE,             /* 保存 */
-    ACT_QUIT,             /* 保存并退出 */
-    ACT_LOAD_PRESET,      /* 载入内置存档 */
-    ACT_LOAD_BACKUP,      /* 载入历史备份 */
-    ACT_PICK_SLOT,        /* 切换槽位 */
-    ACT_CHAR_PREV,        /* 上一个角色 */
-    ACT_CHAR_NEXT,        /* 下一个角色 */
-    ACT_GFX_PRESET,       /* 画质预设 */
-    ACT_GFX_IMPORT,       /* 导入画质 */
-    ACT_GFX_CHECK,        /* 路径自检 */
-    ACT_PICK_ITEM,        /* 直接选中某项 (param=索引) */
-    ACT_SCROLL_UP,        /* 画质列表滚动 */
-    ACT_SCROLL_DOWN,
-    ACT_SCROLL_TOP,       /* ★ v5: 翻到顶 */
-    ACT_SCROLL_BOTTOM,    /* ★ v5: 翻到底 */
-    /* ★ v6 性能调参页 */
-    ACT_GC_LOAD,          /* 载入 update.rpf */
-    ACT_GC_PICK_KNOB,     /* 点选旋钮 (param=索引) */
-    ACT_GC_GROUP_PREV,    /* ★ v24: 跳到上一权重组组首 (S/A/B/C) */
-    ACT_GC_GROUP_NEXT,    /* ★ v24: 跳到下一权重组组首 */
-    ACT_GC_WRITE,         /* 写入 update.rpf */
-    ACT_GC_RESTORE,       /* 恢复原版（套用原版预设） */
-    ACT_GC_SELFTEST,      /* ★ 路径自检 */
-    ACT_GC_VERIFY,        /* ★ 回读校验（确认写入是否生效） */
-    /* ★ v21 DLC 管理页 */
-    ACT_DLC_LOAD,         /* 扫描 dlcpacks + 读 dlclist */
-    ACT_DLC_PICK,         /* 点选某个 DLC (param=索引) */
-    ACT_DLC_TOGGLE,       /* 注册/注销选中项 */
-    ACT_DLC_SCAN_SRC,     /* 扫描待导入目录 */
-    ACT_DLC_IMPORT,       /* 导入选中的待装 DLC（复制+注册） */
-    ACT_DLC_VERIFY,       /* 完整性检查（车辆资源是否齐全） */
-    ACT_DLC_VIEW,         /* 切换视图：已装 / 待导入 */
-    ACT_DLC_CONVERT,      /* ★ v22: 把 PC 格式的包就地转成 Switch 格式 */
-    ACT_DLC_DELETE,       /* ★ v25: 删除选中的已装 DLC（注销 + 清空目录） */
-    ACT_DLC_HIDEHD,       /* ★ v5.4: 屏蔽高清贴图（+hi.ytd 系，对标官方） */
-    ACT_OPEN_MODELDIR,    /* ★ v5.4: 打开/定位模型目录（SD 卡 dlcpacks） */
-    /* ★ v5.5 脚本 mod 独立页 */
-    ACT_SCRIPT_SCAN,      /* 重新扫描 .nsc */
-    ACT_SCRIPT_INSTALL,   /* 安装选中的 .nsc */
-    ACT_SCRIPT_UNINSTALL, /* 删除选中的已装脚本 */
-    ACT_SCRIPT_DIR,       /* 显示脚本目录路径（并自动建目录） */
-    /* ★ v6.2: 脚本管理二级菜单（还原官方 + 内置模组一键安装）
-     *   原先是两个「还原官方 error_listener / controller」按钮 —— 文字太长
-     *   会溢出格子（实机截图已证实），现合并为一个入口进弹窗。 */
-    ACT_SCRIPT_MGR,
-    ACT_SCRIPT_CONFIRM_OK,    /* ★ v6.2: 二次确认弹窗的「确认」按钮 */
-} UiAction;
-
-/* ★ 手动调整列表可见行数（行高 34 ⇒ 9 行 = 306，留出提示行空间） */
-#define GC_KNOB_VIS 12
-
 /* 可点区域 */
 #define MAX_HOTZONES 96
 typedef struct {
@@ -196,26 +108,6 @@ static HidTouchScreenState g_touch;
 static int g_touch_x = -1, g_touch_y = -1;   /* 当前触摸点 (-1=无) */
 static int g_touch_tapped = 0;               /* 本帧是否有「新触摸」 */
 static u64 g_touch_last_tick = 0;            /* 上次触摸时间(防连击) */
-
-/* ★★ v24 触屏点击反馈（用户反馈「选中按钮没有高亮显示」）
- *   点中任意热区后，把该热区的【矩形副本】与时间记下来，
- *   渲染时在所有 UI 之上叠一层醒目高亮框（先白后金，TAP_FX_MS 内渐隐）。
- *   为什么记矩形而不是记坐标：点页签/列表项会导致本帧热区表整体变化，
- *   用坐标重新命中会打到别的控件上；记矩形则一定画在「你刚点的那个东西」上。 */
-static int  g_tap_fx[4] = {0, 0, 0, 0};      /* x, y, w, h */
-static int  g_tap_fx_on  = 0;
-static u64  g_tap_fx_tick = 0;
-#define TAP_FX_MS 420
-
-/* ★ v24: 该矩形是否就是「刚被点的那个热区」--给按钮画按下高亮用
- *   （必须在渲染里逐帧判断，不能缓存：按钮栏每帧重算位置） */
-static int tap_is_hot(int x, int y, int w, int h) {
-    if (!g_tap_fx_on) return 0;
-    u64 el = (svcGetSystemTick() - g_tap_fx_tick) * 1000 / 19200000ULL;
-    if (el >= TAP_FX_MS) return 0;
-    return (g_tap_fx[0] == x && g_tap_fx[1] == y &&
-            g_tap_fx[2] == w && g_tap_fx[3] == h);
-}
 
 static void hot_reset(void) { g_hot_count = 0; }
 
@@ -296,44 +188,13 @@ static void gfx_rect_outline(uint32_t *fb, int x, int y, int w, int h, int thick
 }
 
 /* ★ v28: sqrt 近似（避免拉 libm；牛顿迭代 4 轮足够画圆角） */
-static double sqrt_approx(double v) {
-    if (v <= 0) return 0;
-    double x = v > 1 ? v : 1;
-    for (int i = 0; i < 4; i++) x = (x + v / x) * 0.5;
-    return x;
-}
-
 /* ★ v29: 全局卡片圆角开关 -- 0 = 直角卡片（当前风格，更利落）
  *   想恢复圆角只需改成 6/8/10，所有调用点自动跟随 */
 #define CARD_R 0
 
 /* ★ v28: 卡片（纯色块 + 可选圆角，无描边）
  *   r = 圆角半径；★ v29 起由 CARD_R 统一覆盖，调用点传值不再生效 */
-static void gfx_card(uint32_t *fb, int x, int y, int w, int h, uint32_t color, int r) {
-    r = CARD_R;                       /* ★ v29: 统一由开关控制 */
-    if (r <= 0) { gfx_rect(fb, x, y, w, h, color); return; }
-    if (r > h / 2) r = h / 2;
-    if (r > w / 2) r = w / 2;
-    /* 中段（不含上下圆角带） */
-    gfx_rect(fb, x, y + r, w, h - 2 * r, color);
-    /* 上/下直边段 */
-    gfx_rect(fb, x + r, y, w - 2 * r, r, color);
-    gfx_rect(fb, x + r, y + h - r, w - 2 * r, r, color);
-    /* 四角：逐行阶梯近似圆弧 */
-    for (int i = 1; i < r; i++) {
-        int inset = (int)(r - sqrt_approx((double)r * r - (double)i * i));
-        gfx_rect(fb, x + r - inset, y + r - i, inset, 1, color);            /* 左上 */
-        gfx_rect(fb, x + w - r, y + r - i, inset, 1, color);                /* 右上 */
-        gfx_rect(fb, x + r - inset, y + h - r + i - 1, inset, 1, color);    /* 左下 */
-        gfx_rect(fb, x + w - r, y + h - r + i - 1, inset, 1, color);        /* 右下 */
-    }
-}
-
 /* ★ v28: 左侧主色条（选中标记，Goldleaf 风格 3px） */
-static void gfx_accent_bar(uint32_t *fb, int x, int y, int h, uint32_t color) {
-    gfx_rect(fb, x, y, 3, h, color);
-}
-
 /* UTF-8 解码 */
 static uint32_t utf8_next(const char **p) {
     const uint8_t *s = (const uint8_t*)*p;
@@ -434,49 +295,13 @@ static int draw_text_c(uint32_t *fb, int cx, int y, int size, const char *str, u
 }
 
 /* 右对齐绘制: 以 rx 为右边界 */
-static int draw_text_r(uint32_t *fb, int rx, int y, int size, const char *str, uint32_t color) {
-    int w = text_width(str, size);
-    int x = rx - w;
-    draw_text(fb, x, y, size, str, color);
-    return x;
-}
-
 /* ========================================================================= */
 /* ★ v5: 自绘符号 -- 系统共享字体缺 U+2212(−) / U+25C0(◀) / U+25B6(▶) 等字形,
  *   直接用矩形拼, 完全不依赖字体, 保证任何环境下都显示正常。
  *   cx,cy = 符号中心; sz = 符号半径/半宽; th = 笔画粗细 */
 /* 三角形 (dir: 0=上 1=下 2=左 3=右) */
-static void gfx_tri(uint32_t *fb, int cx, int cy, int sz, int dir, uint32_t color) {
-    for (int i = 0; i < sz; i++) {
-        int span = sz - i;                       /* 越远离尖端越宽 */
-        switch (dir) {
-            case 0: gfx_rect(fb, cx - span, cy - sz + i, span * 2, 1, color); break; /* 上 */
-            case 1: gfx_rect(fb, cx - span, cy + sz - i, span * 2, 1, color); break; /* 下 */
-            case 2: gfx_rect(fb, cx - sz + i, cy - span, 1, span * 2, color); break; /* 左 */
-            default:gfx_rect(fb, cx + sz - i, cy - span, 1, span * 2, color); break; /* 右 */
-        }
-    }
-}
-
 /* 加号 / 减号 (减号也自绘, 避开字体缺字形) */
-static void gfx_plus_sign(uint32_t *fb, int cx, int cy, int arm, int th, uint32_t color) {
-    gfx_rect(fb, cx - arm, cy - th / 2, arm * 2, th, color);   /* 横 */
-    gfx_rect(fb, cx - th / 2, cy - arm, th, arm * 2, color);   /* 竖 */
-}
-static void gfx_minus_sign(uint32_t *fb, int cx, int cy, int arm, int th, uint32_t color) {
-    gfx_rect(fb, cx - arm, cy - th / 2, arm * 2, th, color);   /* 只有横 */
-}
-
 /* 实心圆点 (状态指示) */
-static void gfx_dot(uint32_t *fb, int cx, int cy, int r, uint32_t color) {
-    for (int j = -r; j <= r; j++) {
-        for (int i = -r; i <= r; i++) {
-            if (i * i + j * j <= r * r)
-                gfx_rect(fb, cx + i, cy + j, 1, 1, color);
-        }
-    }
-}
-
 /* 屏幕中央提示 (保存成功 / 载入成功等), 2.5 秒后自动消失 */
 static char     g_toast_msg[160] = {0};
 static uint32_t g_toast_color = C_GREEN;
@@ -596,49 +421,6 @@ static void dlc_prog_frame(void) {
 }
 
 /* 渲染屏幕中央提示框 (每帧调用, 到点自动隐藏) */
-static void draw_toast(uint32_t *fb) {
-    if (g_toast_msg[0] == '\0') return;
-    uint64_t elapsed = (svcGetSystemTick() - g_toast_tick) * 1000 / 19200000ULL; /* ns -> ms (192MHz) */
-    if (elapsed > 2500) { g_toast_msg[0] = '\0'; return; }
-
-    /* 淡出: 最后 500ms 渐隐 */
-    uint32_t alpha = 255;
-    if (elapsed > 2000) alpha = (uint32_t)(255 - (elapsed - 2000) * 255 / 500);
-    if (alpha == 0) { g_toast_msg[0] = '\0'; return; }
-
-    /* 估算文本宽度 (中文字符按字号宽, 近似) */
-    int msg_len = 0; const char *p = g_toast_msg;
-    while (*p) { uint32_t cp = utf8_next(&p); if (cp == 0) break; msg_len++; }
-    int font_h = 26;
-    int box_w = 60 + msg_len * font_h;
-    if (box_w > FB_WIDTH - 100) box_w = FB_WIDTH - 100;
-    int box_h = 72;
-    int bx = (FB_WIDTH - box_w) / 2;
-    int by = (FB_HEIGHT - box_h) / 2;
-
-    /* 半透明背景 + 金色边框 (带 alpha) */
-    for (int j = by; j < by + box_h; j++) {
-        for (int i = bx; i < bx + box_w; i++) {
-            if (i < 0 || i >= FB_WIDTH || j < 0 || j >= FB_HEIGHT) continue;
-            uint32_t *dst = fb + j * g_stride_words + i;
-            uint32_t cur = *dst;
-            uint8_t cr = (cur >> 0) & 0xFF, cg = (cur >> 8) & 0xFF, cb = (cur >> 16) & 0xFF;
-            uint8_t br = (0x18 >> 0) & 0xFF, bg = (0x1C >> 8) & 0xFF, bb = (0x22 >> 16) & 0xFF;
-            uint8_t a = (uint8_t)(200 * alpha / 255);
-            uint8_t or_ = (br * a + cr * (255 - a)) / 255;
-            uint8_t og = (bg * a + cg * (255 - a)) / 255;
-            uint8_t ob = (bb * a + cb * (255 - a)) / 255;
-            *dst = (0xFFu << 24) | ((uint32_t)ob << 16) | ((uint32_t)og << 8) | or_;
-        }
-    }
-    gfx_rect_outline(fb, bx, by, box_w, box_h, 2, C_BORDER_SEL);
-
-    /* 提示文本 (居中) */
-    int tx = bx + (box_w - msg_len * (font_h - 4)) / 2;
-    int ty = by + (box_h - font_h) / 2 - 2;
-    draw_text(fb, tx, ty, font_h, g_toast_msg, g_toast_color);
-}
-
 /* 从存档头部 0x04 提取 UTF-16LE 剧情任务标题及游戏时间戳 */
 static void extract_save_title(const uint8_t *header, char *out_title, size_t max_len) {
     if (!header || !out_title || max_len == 0) return;
@@ -664,37 +446,8 @@ static void extract_save_title(const uint8_t *header, char *out_title, size_t ma
 /* ========================================================================= */
 /* 角色及属性定义                                                            */
 /* ========================================================================= */
-static const char *CHAR_NAMES_CN[3] = { "富兰克林", "麦克", "崔佛" };
-static const char *CHAR_NAMES_EN[3] = { "Franklin", "Michael", "Trevor" };
-/* ★ v6.3.2: 按语言选角色名 */
-#define CHAR_NAME(i) (g_lang_en ? CHAR_NAMES_EN[(i)] : CHAR_NAMES_CN[(i)])
-static const int   CHAR_SP_INDEX[3] = { 1, 0, 2 }; /* Franklin=SP1, Michael=SP0, Trevor=SP2 */
-
 #define NUM_ATTRS 9
-static const char *ATTR_NAMES[NUM_ATTRS] = {
-    "现金 (Cash)",
-    "体力 (Stamina)",
-    "射击 (Shooting)",
-    "力量 (Strength)",
-    "潜行 (Stealth)",
-    "飞行 (Flying)",
-    "驾驶 (Driving)",
-    "肺活量 (Lung)",
-    "特殊能力 (Special)"
-};
-static const char *ATTR_NAMES_EN[NUM_ATTRS] = {
-    "Cash",
-    "Stamina",
-    "Shooting",
-    "Strength",
-    "Stealth",
-    "Flying",
-    "Driving",
-    "Lung Capacity",
-    "Special"
-};
-#define ATTR_NAME(i) (g_lang_en ? ATTR_NAMES_EN[(i)] : ATTR_NAMES[(i)])
-
+static const int CHAR_SP_INDEX[3] = {1, 0, 2};
 /* 8 大技能对应的 4 字节哈希特征 (针对 Franklin=sp1, Michael=sp0, Trevor=sp2) */
 static const uint8_t SKILL_HASHES[3][8][4] = {
     /* Franklin (sp1_*) */
@@ -883,17 +636,6 @@ static const BehaviorField SKILL_BEHAVIORS[8][3][SKILL_BEHAVIOR_CNT] = {
 #define BEHAVIOR_MAX_SEC   10000000u    /* TIME 秒型统计上限 (约115天) */
 
 /* 金钱步进档位 (1千 ~ 1000万) */
-static const uint32_t CASH_STEPS[] = { 1000, 10000, 100000, 1000000, 10000000 };
-static const char *CASH_STEP_NAMES[]    = { "1千", "1万", "10万", "100万", "1000万" };
-static const char *CASH_STEP_NAMES_EN[] = { "1K", "10K", "100K", "1M", "10M" };
-#define CASH_STEP_NAME(i) (g_lang_en ? CASH_STEP_NAMES_EN[(i)] : CASH_STEP_NAMES[(i)])
-#define NUM_CASH_STEPS 5
-
-/* 技能属性步进档位 (1 ~ 20点) */
-static const uint32_t SKILL_STEPS[] = { 1, 5, 10, 20 };
-static const char *SKILL_STEP_NAMES[] = { "+1", "+5", "+10", "+20" };
-#define NUM_SKILL_STEPS 4
-
 /* 5 大内置进度存档 (打包在 romfs 中) */
 typedef struct {
     const char *name;
@@ -972,7 +714,7 @@ static GfxItem g_gfx_items[GFX_MAX_ITEMS];
 static int     g_gfx_count = 0;          /* 当前解析出的项数 */
 static int     g_gfx_dirty = 0;          /* 画质有未保存修改 */
 static char    g_gfx_path[512] = {0};    /* 当前画质文件路径 */
-static char    g_gfx_cur_idx = 0;        /* 当前选中画质项 */
+static int     g_gfx_cur_idx = 0;        /* 当前选中画质项 */
 
 /* ★ v4: 页签系统 (0=存档 1=画质 2=工具) -- 取代原 g_gfx_show 的覆盖式页面 */
 /* ★ v6 (2026-10-01): 页签逻辑 ID 重排 —— 移除「存档修改」后编号连续。
@@ -988,39 +730,7 @@ static char    g_gfx_cur_idx = 0;        /* 当前选中画质项 */
 #define TAB_TOOL 4          /* 工具信息 */
 #define NUM_TABS 5          /* ★ v6: 6 -> 5 */
 
-/* ★★ 页签唯一定义源：顺序 = 显示顺序。
- * 以前 TAB_TOOL=2 / TAB_PERF=3 与 TAB_NAME[] 的下标不一致，
- * 导致「点工具信息却显示性能调参」（编号与位置错位）。
- * 现在名字/ID/动作三者绑在一起，不可能再错位。
- * ★★ v25: DLC 管理提升为主要功能 ⇒ 放第 1 位，启动默认就在这页。
- * ★★ v6: 移除「存档修改」页（用户要求），编号重排为 0..4。 */
-typedef struct { const char *name; int id; int action; } TabDef;
-/* ★ v6.3: 双语两份表（static 初始化器里不能用运行时 TR()，编译期常量才行） */
-static const TabDef TABS_ZH[NUM_TABS] = {
-    { "DLC管理",  TAB_DLC,    ACT_TAB_DLC    },
-    { "脚本MOD",  TAB_SCRIPT, ACT_TAB_SCRIPT },
-    { "画质设置", TAB_GFX,    ACT_TAB_GFX    },
-    { "性能调参", TAB_PERF,   ACT_TAB_PERF   },
-    { "工具信息", TAB_TOOL,   ACT_TAB_TOOL   },
-};
-static const TabDef TABS_EN[NUM_TABS] = {
-    { "DLC",      TAB_DLC,    ACT_TAB_DLC    },
-    { "Scripts",  TAB_SCRIPT, ACT_TAB_SCRIPT },
-    { "Graphics", TAB_GFX,    ACT_TAB_GFX    },
-    { "Perf",     TAB_PERF,   ACT_TAB_PERF   },
-    { "Tools",    TAB_TOOL,   ACT_TAB_TOOL   },
-};
-#define TABS (g_lang_en ? TABS_EN : TABS_ZH)
-
-/* ★ v25: 默认页 = DLC 管理（主要功能），进去后自动扫描在 ACT_TAB_DLC 里做 */
 static int g_tab = TAB_DLC;
-
-/* ★ v4: 画质列表滚动偏移 (60 项一屏放不下, 需要滚动) */
-static int g_gfx_scroll = 0;
-/* ★ v4: 底部大号 −/+ 按住连发 */
-static int g_big_hold_dir = 0;      /* 1=+, -1=-, 0=无 */
-static int g_fast_scroll = 0;       /* ★ v28 右摇杆快速滚动剩余行数；★ v31 右摇杆并入左摇杆导航 ⇒ 恒为 0（保留管道便于恢复） */
-static int g_big_hold_tick = 0;
 
 /* ========================================================================= */
 /* ★ v6: 性能调参页 (gameconfig.xml)                                          */
@@ -1048,7 +758,6 @@ static u8    *g_gc_orig_blob = NULL;            /* 原始压缩块（备份用�
 static size_t g_gc_orig_len  = 0;
 static char   g_gc_msg[192] = {0};
 static uint32_t g_gc_msg_color = C_TEXT_MUTED;
-static int    g_gc_confirm  = 0;                /* 1=写入确认弹窗 2=恢复原版确认 */
 
 /* 手动调整时被改过的旋钮（记录原值以便显示已改） */
 #define GC_MAX_EDITED 128
@@ -1065,28 +774,6 @@ static void gc_msg(const char *fmt, ...) {
 
 /* ★ v24: 权重分组跳转（原 L/R 的功能，L/R 收归全局换页后移到按钮栏）
  *   分组 = weight 1(S金) / 2(A蓝) / 3(B灰) / 4(C红勿调) */
-static void gc_group_jump(int dir) {
-    if (g_gc_knob < 0) g_gc_knob = 0;
-    if (g_gc_knob >= GC_NUM_KNOB_META) g_gc_knob = GC_NUM_KNOB_META - 1;
-    int w = GC_KNOB_META[g_gc_knob].weight;
-    int t = g_gc_knob;
-    if (dir < 0) {
-        while (t > 0 && GC_KNOB_META[t - 1].weight == w) t--;
-        if (t == g_gc_knob) {                       /* 已在组首 -> 跳上一组组首 */
-            while (t > 0 && GC_KNOB_META[t - 1].weight != w) t--;
-            while (t > 0 && GC_KNOB_META[t - 1].weight == GC_KNOB_META[t].weight) t--;
-        }
-    } else {
-        while (t + 1 < GC_NUM_KNOB_META && GC_KNOB_META[t + 1].weight == w) t++;
-        if (t + 1 < GC_NUM_KNOB_META) t++;          /* 跳下一组组首 */
-    }
-    g_gc_knob = t;
-    if (g_gc_knob < g_gc_knob_scr) g_gc_knob_scr = g_gc_knob;
-    if (g_gc_knob >= g_gc_knob_scr + GC_KNOB_VIS)
-        g_gc_knob_scr = g_gc_knob - GC_KNOB_VIS + 1;
-    if (g_gc_knob_scr < 0) g_gc_knob_scr = 0;
-}
-
 /* 打开失败的详细诊断（每个候选路径都探测一遍，显示真实原因） */
 static char g_gc_diag[3][256];      /* 每个候选路径的诊断行 */
 static int  g_gc_diag_n = 0;
@@ -1286,26 +973,10 @@ static int      g_behavior_found[8][3][SKILL_BEHAVIOR_CNT];
 /* 技能修改标记: [角色][技能1~7]=1 表示该技能被用户改过, 保存时同步行为统计 */
 static int      g_skill_modified[3][8] = {{0}};
 
-static int      g_cur_char = 0;        /* 0: 富兰克林, 1: 麦克, 2: 崔佛 (v24: 点顶部角色标签切换) */
-static int      g_cur_attr = 0;        /* 0~8: 当前选择的属性项目 (按←/->切换) */
-static int      g_cash_step_idx = 1;   /* 默认金额步长 1万 */
-static int      g_skill_step_idx = 2;  /* 默认技能步长 10点 */
 static int      g_dirty = 0;
 static char     g_status_msg[256] = "";  /* ★ v6.3: 初始文案改为运行时按语言填 */
 static uint32_t g_status_color = C_TEXT;
 
-/* 弹窗模态: 0=主界面, 1=内置存档, 2=历史备份库, 3=当前目录槽位
- *           4=画质预设, 5=画质文件, 6=画质自检
- *   ★ v6.2 新增: 7=脚本管理（还原官方 + 内置模组）, 8=操作二次确认 */
-static int g_modal_mode = 0;
-static int g_modal_sel = 0;
-static int g_modal_scr = 0;      /* ★ 弹窗列表滚动偏移（画质预设弹窗用） */
-
-/* ★ v6.2: 脚本管理弹窗状态
- *   选中行沿用 g_modal_sel（0..2 = 还原官方 3 项；3..6 = 内置模组 4 项）
- *   g_mod_pending_* : 待二次确认的操作 */
-#define MODE_SCRIPT_MGR     7
-#define MODE_SCRIPT_CONFIRM 8
 static int g_mod_pending_kind = 0;            /* 0 = 还原官方, 1 = 装内置模组 */
 static int g_mod_pending_idx  = 0;            /* 对应的索引 */
 
@@ -2099,7 +1770,6 @@ static int parse_and_decrypt_buffer(void) {
 
     /* 提取三位角色的金钱与技能属性 */
     for (int i = 0; i < 3; i++) {
-        int sp_idx = CHAR_SP_INDEX[i];
 
         /* 0: 金钱 (gta5_char 枚举序 0=F/1=M/2=T, 与界面角色序 i 一致) */
         uint32_t money_val = 0;
@@ -2136,7 +1806,6 @@ static int parse_and_decrypt_buffer(void) {
 
     /* 记录每位角色 7 项技能的行为统计偏移与当前值 (用于UI显示与保存写入) */
     for (int i = 0; i < 3; i++) {
-        int sp_idx = CHAR_SP_INDEX[i];
         for (int k = 1; k < 8; k++) {   /* 技能 1~7 (特殊能力 8 不参与重算) */
             for (int f = 0; f < SKILL_BEHAVIOR_CNT; f++) {
                 const BehaviorField *bf = &SKILL_BEHAVIORS[k][sp_idx][f];
@@ -2441,7 +2110,6 @@ static DlcItem g_dlc_items[DLC_MAX];
 static void dlc_msg(const char *fmt, ...);
 static void dlc_err(const char *fmt, ...);
 static void script_show_dir(void);      /* ★ v5.5: 前向声明（ACT_SCRIPT_DIR 里要用） */
-static void script_mgr_open(void);      /* ★ v6.2: 打开脚本管理弹窗 */
 static void script_mgr_apply(void);     /* ★ v6.2: 执行已确认的动作 */
 static void script_scan(void);          /* ★ v5.5: 前向声明 */
 static void script_verify_installed(void);  /* ★ v5.7: script_scan 里要用（定义在后） */
@@ -2502,7 +2170,7 @@ static int script_file_usable(u32 size) {
 }
 
 static ScriptItem g_script_items[GC_SCRIPT_MAX];
-static int g_script_count = 0, g_script_sel = 0, g_script_scr = 0;
+static int g_script_count = 0, g_script_sel = 0;
 static int g_script_rpf_n     = -1;   /* ★ v5.6: RPF 里读到的 .nsc 条数（<0 = 读失败） */
 static char g_script_rpf_err[200] = {0};  /* ★ v5.6: 读失败原因 */
 /* ★ v5.7: 页内目录信息面板（点「目录信息」/ 按 Y 显示，再按一次关闭）
@@ -2634,16 +2302,6 @@ static void script_uninstall_selected(void) {
  *   【内置模组】    4 项（打进 NRO，一键装，免插卡拷文件），署名原作者
  *
  * 每项都走【二次确认】（弹窗 8），因为都会覆盖 RPF 里的既有脚本。 */
-static int script_mgr_total(void) {
-    return gc_script_stock_count() + gc_script_builtin_count();
-}
-
-static void script_mgr_open(void) {
-    g_modal_mode = MODE_SCRIPT_MGR;
-    g_modal_sel = 0;
-    g_modal_scr = 0;
-}
-
 /* 执行二次确认通过的动作 */
 static void script_mgr_apply(void) {
     char err[256];
@@ -2681,12 +2339,6 @@ static void script_mgr_apply(void) {
 }
 
 /* 进入二次确认弹窗 */
-static void script_mgr_ask(int kind, int idx) {
-    g_mod_pending_kind = kind;
-    g_mod_pending_idx  = idx;
-    g_modal_mode = MODE_SCRIPT_CONFIRM;
-}
-
 static void script_install_selected(void) {
     if (g_script_sel < 0 || g_script_sel >= g_script_count) { dlc_err(TR("没有选中项", "Nothing selected")); return; }
     ScriptItem *it = &g_script_items[g_script_sel];
@@ -2766,14 +2418,12 @@ static void script_show_dir(void) {
 static int dlc_src_path_of(const char *name, char *out, size_t outsz);
 static int     g_dlc_count   = 0;      /* 已装 DLC 数 */
 static int     g_dlc_sel     = 0;      /* 当前选中 */
-static int     g_dlc_scr     = 0;      /* 列表滚动偏移 */
 static int     g_dlc_view    = 0;      /* 0=已装  1=待导入 */
 
 /* 待导入（从 /switch/ 等目录扫到的 dlcpack） */
 static DlcItem g_dlc_src[DLC_SRC_MAX];
 static int     g_dlc_src_count = 0;
 static int     g_dlc_src_sel   = 0;
-static int     g_dlc_src_scr   = 0;
 static char    g_dlc_src_dir[DLC_SRC_DIR_MAX][256];
 static int     g_dlc_src_dir_n = 0;
 
@@ -3667,19 +3317,7 @@ static int dlc_import_selected(void) {
 }
 
 /* 判「包是否已经是 Switch 格式」的包装（带缓存友好：只读 TOC+names） */
-static int dlc_format_of(const char *name) {
-    char rpf[400];
-    snprintf(rpf, sizeof(rpf), "%s/%s/dlc.rpf", DLC_DLCPACKS, name);
-    return gc_dlc_is_switch_format(rpf);
-}
-
 /* ★ v31: 地图数据自检的包装（只读 RPF 头部，很快） */
-static int dlc_check_map_of(const char *name) {
-    char rpf[400];
-    snprintf(rpf, sizeof(rpf), "%s/%s/dlc.rpf", DLC_DLCPACKS, name);
-    return gc_dlc_check_map(rpf);
-}
-
 /* ★★ 对「已装但格式不对」的包就地转换（不重新导入）
  *    用途：用户之前用旧版工具导入了 PC 格式的包，现在一键修好 */
 static int dlc_convert_selected(void) {
@@ -3785,36 +3423,6 @@ static int dlc_hide_hd_selected(void) {
 /* ★ v5.4: 模型目录信息 —— 列出 SD 卡上 3 个相关目录的路径与内容统计
  *   Switch 无文件管理器，这里把路径直接给出来，方便用户在电脑上找。
  *   统计每个目录下的子目录数（= 装了/待装的 mod 数）。 */
-static void dlc_show_modeldir(void) {
-    /* ★ v6.3.2: 局部数组（非 static）才能用运行时 TR() */
-    const struct { const char *p; const char *lab; } D[] = {
-        { DLC_DLCPACKS,               TR("已装模型 dlcpacks", "installed dlcpacks") },
-        { "sdmc:/switch/gta5save/dlc",TR("待导入 dlc", "pending dlc") },
-        { SCRIPT_DIR,                 TR("脚本 mod .nsc", "script mods .nsc") },
-    };
-    int n = (int)(sizeof(D)/sizeof(D[0]));
-    char buf[512];
-    int off = 0;
-    off += snprintf(buf + off, sizeof(buf) - off,
-                    TR("模型目录（共 %d 个）：", "model dirs (%d):"), n);
-    for (int k = 0; k < n; k++) {
-        int cnt = 0;
-        DIR *d = opendir(D[k].p);
-        if (d) {
-            struct dirent *e;
-            while ((e = readdir(d))) {
-                if (e->d_name[0] == '.') continue;
-                cnt++;
-            }
-            closedir(d);
-        }
-        off += snprintf(buf + off, sizeof(buf) - off,
-                        TR("  %s [%d项] %s |", "  %s [%d items] %s |"), D[k].lab, cnt, D[k].p);
-        if (off >= (int)sizeof(buf) - 8) break;
-    }
-    dlc_msg("%s", buf);
-}
-
 /* =========================================================================
  * ★★ v25: 删除 DLC
  *
@@ -4636,7 +4244,6 @@ int main(int argc, char **argv) {
         if(down&HidNpadButton_X) keys|=UI_ACTIONS;
         if(down&HidNpadButton_L) keys|=UI_PREV;
         if(down&HidNpadButton_R) keys|=UI_NEXT;
-        modern_build();
         touch_poll();
         int touched=0;
         if(g_touch_tapped && g_touch_x>=0) {
@@ -4664,7 +4271,7 @@ int main(int argc, char **argv) {
         if(dir!=adjust_dir) {adjust=dir;adjust_ticks=0;}
         else if(dir && ++adjust_ticks>=20 && adjust_ticks%5==0) adjust=dir;
         adjust_dir=dir;
-        if(adjust && !g_ui_dialog && g_ui.focus==UI_LIST) {
+        if(adjust && !g_ui_dialog && !g_view.dialog && g_ui.focus==UI_LIST) {
             if(g_ui.page==UI_GRAPHICS && g_ui.section==1) modern_execute(modern_event(U_GFX_STEP,adjust),0);
             else if(g_ui.page==UI_ADVANCED) modern_execute(modern_event(U_PERF_STEP,adjust),0);
         }

@@ -39,6 +39,7 @@ static int next_char(const char *s) {
 /* Every external filename, translation and error message is width constrained. */
 static void fit(const UiCanvas *c,int x,int y,int size,int width,const char *s,uint32_t col) {
     if (!s) return;
+    if(!strchr(s,'\n') && c->measure(c->ctx,s,size)<=width) {text(c,x,y,size,s,col);return;}
     char b[768]; size_t n=0;int width_used=0;
     while (*s && *s!='\n' && n+8<sizeof(b)) {
         int k=next_char(s);char ch[5]={0};memcpy(ch,s,(size_t)k);
@@ -53,11 +54,15 @@ static void paragraph(const UiCanvas *c,int x,int y,int size,int width,int max_l
                       const char *s,uint32_t col,int skip) {
     if (!s) return;
     for (int line=0;*s && line<max_lines+skip;line++) {
-        char b[768]; size_t n=0;int width_used=0;
+        char b[768]; size_t n=0,last_space=0;int width_used=0;const char *resume=NULL;
         while (*s && *s!='\n' && n+5<sizeof(b)) {
             int k=next_char(s);char ch[5]={0};memcpy(ch,s,(size_t)k);
             int advance=c->measure(c->ctx,ch,size);
-            if (width_used+advance>width && n) break;
+            if (width_used+advance>width && n) {
+                if(resume && last_space>=n/2) {n=last_space;s=resume;}
+                break;
+            }
+            if(*s==' ') {last_space=n;resume=s+1;}
             memcpy(b+n,s,(size_t)k);n+=(size_t)k; s+=k;width_used+=advance;
         }
         b[n]=0;
@@ -106,6 +111,9 @@ void ui_clamp(UiState *s,const UiView *v) {
     if (s->button>=v->button_count) s->button=0;
     if (s->scroll>s->selected) s->scroll=s->selected;
     if (s->selected>=s->scroll+4) s->scroll=s->selected-3;
+    int max_scroll=v->row_count>4?v->row_count-4:0;
+    if(s->scroll>max_scroll) s->scroll=max_scroll;
+    if(s->scroll<0) s->scroll=0;
     if (!v->row_count && s->focus==UI_LIST) s->focus=v->button_count?UI_BUTTONS:UI_SECTIONS;
 }
 static int next_button(const UiView *v,int start,int dir) {
@@ -168,7 +176,7 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
         if(i==UI_ADVANCED) rect(c,28,y-18,172,1,LINE);
         if(active) roundrect(c,16,y,196,49,10,SELECTED);
         icon(c,32,y+13,i,active?UI_ACCENT:UI_MUTED);
-        fit(c,68,y+14,17,138,v->en?en[i]:zh[i],active?UI_ACCENT:UI_MUTED);
+        fit(c,68,y+14,v->en?15:17,138,v->en?en[i]:zh[i],active?UI_ACCENT:UI_MUTED);
         hit(c,16,y,196,49,UI_GO_PAGE,i);
     }
     text(c,30,617,13,"GTA5 SWITCH TOOLBOX",UI_MUTED);
