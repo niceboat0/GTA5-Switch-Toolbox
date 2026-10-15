@@ -49,6 +49,12 @@ int main(void) {
     e=ui_input(&s,&view,UI_ACCEPT);assert(e.action==2000);
     fixture(UI_HOME,4);ui_reset(&s,UI_HOME,0);ui_input(&s,&view,UI_RIGHT|UI_DOWN);assert(s.selected==3);
     e=ui_input(&s,&view,UI_ACCEPT);assert(e.param==3);
+    fixture(UI_RADIO,0);view.button_count=6;
+    for(int i=0;i<6;i++) {view.buttons[i].label="Radio action";view.buttons[i].event=(UiEvent){3000,i};view.buttons[i].disabled=i<3;}
+    ui_reset(&s,UI_RADIO,0);ui_input(&s,&view,0);assert(s.focus==UI_BUTTONS && s.button==3);
+    e=ui_input(&s,&view,UI_ACCEPT);assert(e.action==3000 && e.param==3);
+    ui_input(&s,&view,UI_RIGHT);e=ui_input(&s,&view,UI_ACCEPT);assert(e.param==4);
+    e=ui_input(&s,&view,UI_NEXT);assert(e.action==UI_GO_PAGE && e.param==UI_ADVANCED);
     fixture(UI_MODS,5);ui_reset(&s,UI_MODS,0);s.selected=999;s.scroll=999;ui_clamp(&s,&view);assert(s.selected==4 && s.scroll==1);
     view.row_count=0;ui_clamp(&s,&view);assert(s.selected==0 && s.scroll==0);
     UiCanvas c={NULL,rect,text,measure,hit};

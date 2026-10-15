@@ -18,6 +18,13 @@ jobs:
           ./build/ui-test
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g source/save_backup.c tests/save_backup_test.c -o build/save-backup-test
           ./build/save-backup-test
+      - name: Exercise script, package and exporter backends
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y zlib1g-dev libssl-dev
+          python3 tests/test_scripts.py --output build/scripts
+          python3 tests/test_packages.py --output build/packages
+          python3 tests/test_exporter.py --output build/exporter
   switch:
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:20260219

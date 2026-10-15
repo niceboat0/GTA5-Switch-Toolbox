@@ -104,3 +104,9 @@ from hbmenu.
 - **[ShinyWasabi](https://github.com/ShinyWasabi)** — [RageMenu](https://github.com/ShinyWasabi/RageMenu)
   (the menu base the classic ragemenu was built on)
 - The GTA V Switch port community (Geekmaxxer's tutorial site, GBAtemp)
+
+## v7.1 radio and mod update
+
+MEGATARD v1.0.5 supports Chinese through its menu language setting. Classic ragemenu (original English) by **maritoguionyo** is also bundled from the user-supplied file. Installing either classic version replaces the shared menu/loader and restores stock shop_controller, removing the corresponding MEGATARD replacement.
+
+The new Radio workspace installs verified Self Radio packages or paired Radio Editor outputs, with backups, restore and interruption recovery. **The Self Radio runtime is not bundled**: the author's v1.1 download folder was empty when checked. Obtain its matching HARD runtime and release-verification.json separately; use tools/export_package.py to prepare it. See docs/RADIO.zh.md for paths and commands. This build requires console testing.

@@ -108,6 +108,11 @@ static void icon(const UiCanvas *c,int x,int y,int type,uint32_t col) {
     } else if (type==UI_SAVES) {
         rect(c,x+2,y+2,18,3,col); rect(c,x+2,y+2,3,20,col); rect(c,x+17,y+2,3,20,col);
         rect(c,x+2,y+19,18,3,col); rect(c,x+8,y+3,6,6,col); rect(c,x+7,y+14,8,3,col);
+    } else if (type==UI_RADIO) {
+        rect(c,x+2,y+7,20,3,col); rect(c,x+2,y+7,3,15,col);
+        rect(c,x+19,y+7,3,15,col); rect(c,x+2,y+19,20,3,col);
+        rect(c,x+6,y+2,13,2,col); rect(c,x+7,y+12,5,4,col);
+        rect(c,x+15,y+12,3,3,col);
     } else {
         for(int i=0;i<3;i++) { rect(c,x,y+4+i*7,22,2,col); rect(c,x+4+i*5,y+1+i*7,3,8,col); }
     }
@@ -125,6 +130,12 @@ void ui_clamp(UiState *s,const UiView *v) {
     if(s->scroll>max_scroll) s->scroll=max_scroll;
     if(s->scroll<0) s->scroll=0;
     if (!v->row_count && s->focus==UI_LIST) s->focus=v->button_count?UI_BUTTONS:UI_SECTIONS;
+    if(s->focus==UI_BUTTONS && v->button_count && v->buttons[s->button].disabled) {
+        for(int i=1;i<v->button_count;i++) {
+            int next=(s->button+i)%v->button_count;
+            if(!v->buttons[next].disabled) {s->button=next;break;}
+        }
+    }
 }
 static int next_button(const UiView *v,int start,int dir) {
     for(int n=0;n<v->button_count;n++) {
@@ -174,8 +185,8 @@ UiEvent ui_input(UiState *s,const UiView *v,unsigned keys) {
 }
 
 void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
-    static const char *zh[]={"总览","脚本模组","DLC 管理","画质设置","存档与备份","高级工具"};
-    static const char *en[]={"Overview","Script mods","DLC library","Graphics","Saves & backups","Advanced"};
+    static const char *zh[]={"总览","脚本模组","DLC 管理","画质设置","存档与备份","电台","高级工具"};
+    static const char *en[]={"Overview","Script mods","DLC library","Graphics","Saves & backups","Radio","Advanced"};
     ui_clamp(s,v);
     rect(c,0,0,1280,720,UI_BG); rect(c,0,0,228,720,PANEL); rect(c,227,0,1,720,LINE);
     roundrect(c,28,30,44,44,12,UI_ACCENT); text(c,41,35,27,"V",INK);
@@ -190,7 +201,7 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
         hit(c,16,y,196,49,UI_GO_PAGE,i);
     }
     text(c,30,617,13,"GTA5 SWITCH TOOLBOX",UI_MUTED);
-    text(c,30,642,12,"v7.0.0",UI_MUTED);
+    text(c,30,642,12,"v7.1.0",UI_MUTED);
     text(c,30,680,12,T(v,"L / R  切换页面","L / R  Switch page"),UI_MUTED);
 
     if(s->page==UI_HOME) {

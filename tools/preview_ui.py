@@ -41,7 +41,7 @@ def buttons(v,labels):
     for i,t in enumerate(labels): v.buttons[i].label=u(t)
 def fixture(page,en):
     v=View();v.page=page;v.en=en
-    titles=['Overview','Script mods','DLC library','Graphics','Saves & backups','Advanced tools'] if en else ['总览','脚本模组','DLC 管理','画质设置','存档与备份','高级工具']
+    titles=['Overview','Script mods','DLC library','Graphics','Saves & backups','Radio','Advanced tools'] if en else ['总览','脚本模组','DLC 管理','画质设置','存档与备份','电台','高级工具']
     v.title=u(titles[page]);v.subtitle=u('Preview with sample data / Not connected to a Switch' if en else '界面预览 · 示例数据，未连接 Switch 实机')
     v.status=u('Preview fixture / Native C renderer' if en else '示例数据 · 使用实际 C 界面代码渲染');v.primary=u('A  Review selection' if en else 'A  查看确认内容')
     v.empty_title=u('No external scripts yet' if en else '还没有外部脚本');v.empty_body=u('Place .nsc files below, then choose Rescan. Built-in mods need no file copying.' if en else '把 .nsc 文件放入下方目录，再选择「重新扫描」。也可以切到「内置模组」直接安装。');v.empty_path=b'sdmc:/switch/gta5save/script/'
@@ -50,8 +50,9 @@ def fixture(page,en):
     elif page==1:
         v.section_count=3
         for i,t in enumerate(['Built-in mods','External scripts','Restore stock'] if en else ['内置模组','外部脚本','恢复官方']):v.sections[i]=u(t)
-        row(v,'MEGATARD v0.9.9' if en else 'MEGATARD v0.9.9 汉化','By Geekmaxxer / 2 scripts' if en else '作者 Geekmaxxer / 2 个脚本文件','Bundled' if en else '已内置','Conflicts with classic ragemenu.\nConflict checks run automatically. Restart the game after installation.' if en else '与经典 ragemenu 互斥。\n安装会覆盖同名脚本。互斥检测与回读校验自动执行，完成后重启游戏。')
-        row(v,'Classic ragemenu' if en else '经典 ragemenu 简体','By maritoguionyo / 2 scripts' if en else '作者 maritoguionyo / 2 个脚本文件','Bundled' if en else '已内置')
+        row(v,'MEGATARD v1.0.5' if en else 'MEGATARD v1.0.5（支持中文）','By MEGATARD / 3 scripts' if en else '作者 MEGATARD / 3 个脚本文件','Bundled' if en else '已内置','Conflicts with classic ragemenu.\nConflict checks run automatically. Restart the game after installation.' if en else '与经典 ragemenu 互斥。\n安装会覆盖同名脚本。互斥检测与回读校验自动执行，完成后重启游戏。')
+        row(v,'Classic ragemenu' if en else '经典 ragemenu 简体','By maritoguionyo / 3 scripts' if en else '作者 maritoguionyo / 3 个脚本文件','Bundled' if en else '已内置')
+        row(v,'Classic ragemenu (original English)' if en else '经典 ragemenu 原版英文','By maritoguionyo / 3 scripts' if en else '作者 maritoguionyo / 3 个脚本文件','Bundled' if en else '已内置')
         row(v,'HotCoffee + Zombies' if en else '热咖啡 + 丧尸','By Je11yb0ne / CinnamonCoffee','Bundled' if en else '已内置')
         row(v,'HotCoffee' if en else '热咖啡（不含丧尸）','By Je11yb0ne / CinnamonCoffee','Bundled' if en else '已内置')
         buttons(v,['Install selected','Rescan','Folder & status'] if en else ['安装所选','重新扫描','目录与状态'])
@@ -69,6 +70,14 @@ def fixture(page,en):
         for i,t in enumerate(['Story saves','Backups','Target slot'] if en else ['进度存档','历史备份','目标槽位']):v.sections[i]=u(t)
         for n,t in [('4%','序章初入洛圣都'),('20%','崔佛登场'),('31.6%','佩立托银行前夕'),('61.1%','终局大干一票'),('100%','完美全通关')]:row(v,n+' Story progress' if en else n+' '+t,'Write to the selected target slot' if en else '确认后写入当前目标槽位','Bundled' if en else '内置')
         buttons(v,['Write selected','Refresh','Save pending'] if en else ['写入所选','刷新列表','保存待写入修改']);v.buttons[2].disabled=1
+    elif page==5:
+        v.section_count=3
+        for i,t in enumerate(['Self Radio','Replace station','Setup guide'] if en else ['自定义电台','替换原电台','使用说明']):v.sections[i]=u(t)
+        v.empty_title=u('No radio packages found' if en else '没有找到电台安装包')
+        v.empty_body=u('Runtime not bundled. Read Setup guide, prepare a package folder containing package.txt, then rescan.' if en else '运行包未内置。先阅读「使用说明」，准备包含 package.txt 的安装包文件夹，再重新扫描。')
+        v.empty_path=b'sdmc:/switch/gta5save/packages/'
+        buttons(v,['Install selected','Restore backup','Check status','Rescan','Recover interrupted','Setup guide'] if en else ['安装所选','还原备份','检查状态','重新扫描','中断恢复','使用说明'])
+        for i in range(3):v.buttons[i].disabled=1
     else:
         v.section_count=2;v.sections[0]=u('Parameters' if en else '参数调整');v.sections[1]=u('Diagnostics' if en else '维护诊断')
         for name,value in [('Vehicle pool','256'),('Pedestrian pool','200'),('Streaming budget','512'),('Traffic density','100')]:row(v,name,'gameconfig.xml / 0 ~ 1024',value)
@@ -100,9 +109,9 @@ def main():
     @Hit
     def hit(*args):pass
     canvas=Canvas(None,rect,text,measure,hit)
-    names=['overview','mods','dlc','graphics','saves','advanced']
+    names=['overview','mods','dlc','graphics','saves','radio','advanced']
     for en in (0,1):
-        for page in range(6):
+        for page in range(7):
             image=Image.new('RGB',(1280,720));draw=ImageDraw.Draw(image);v=fixture(page,en);s=State(page,0,0,0,0,0)
             lib.ui_render(c.byref(canvas),c.byref(s),c.byref(v));image.save(out/(names[page]+('-en' if en else '-zh')+'.png'))
         for kind in ('empty','confirm','report'):
@@ -110,7 +119,7 @@ def main():
             if kind=='empty':v.row_count=0;v.section=1;s.section=1;v.buttons[0].disabled=1
             else:
                 v.dialog=1 if kind=='confirm' else 2;v.dialog_title=u('Confirm installation?' if en else '确认安装此模组？')
-                v.dialog_body=u('MEGATARD v0.9.9\nTarget: update2.rpf / script_rel.rpf\n\nThis replaces same-name game scripts. Conflict detection and verification run automatically.\n\nKeep a complete archive backup and restart the game afterwards.' if en else 'MEGATARD v0.9.9 汉化\n目标：update2.rpf / script_rel.rpf\n\n安装会覆盖同名游戏脚本。互斥检测与回读校验自动执行。\n\n请先保留完整 RPF 备份。完成后重启游戏生效。')
+                v.dialog_body=u('MEGATARD v1.0.5\nTarget: update2.rpf / script_rel.rpf\n\nThis replaces same-name game scripts. Conflict detection and verification run automatically.\n\nKeep a complete archive backup and restart the game afterwards.' if en else 'MEGATARD v1.0.5（支持中文）\n目标：update2.rpf / script_rel.rpf\n\n安装会覆盖同名游戏脚本。互斥检测与回读校验自动执行。\n\n请先保留完整 RPF 备份。完成后重启游戏生效。')
             lib.ui_render(c.byref(canvas),c.byref(s),c.byref(v));image.save(out/(kind+('-en' if en else '-zh')+'.png'))
     print('Rendered 18 previews using source/ui.c with sample data.')
 

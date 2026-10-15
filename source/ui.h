@@ -6,7 +6,7 @@
 /* Platform independent presentation and navigation; no filesystem writes here. */
 #define UI_MAX_ROWS 256
 #define UI_MAX_BUTTONS 6
-#define UI_PAGE_COUNT 6
+#define UI_PAGE_COUNT 7
 #define UI_RGB(r,g,b) (0xff000000u | ((uint32_t)(b)<<16) | ((uint32_t)(g)<<8) | (r))
 #define UI_BG UI_RGB(15,21,28)
 #define UI_SURFACE UI_RGB(24,34,44)
@@ -16,7 +16,7 @@
 #define UI_WARN UI_RGB(244,197,115)
 #define UI_ERROR UI_RGB(255,147,147)
 
-enum { UI_HOME, UI_MODS, UI_DLC, UI_GRAPHICS, UI_SAVES, UI_ADVANCED };
+enum { UI_HOME, UI_MODS, UI_DLC, UI_GRAPHICS, UI_SAVES, UI_RADIO, UI_ADVANCED };
 enum { UI_LIST, UI_SECTIONS, UI_BUTTONS };
 enum { UI_UP=1, UI_DOWN=2, UI_LEFT=4, UI_RIGHT=8, UI_ACCEPT=16,
        UI_ACTIONS=32, UI_PREV=64, UI_NEXT=128, UI_BACK=256 };

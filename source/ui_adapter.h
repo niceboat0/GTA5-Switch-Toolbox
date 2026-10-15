@@ -10,7 +10,8 @@ enum {
     U_GFX_PRESET, U_GFX_IMPORT, U_GFX_SAVE, U_GFX_CHECK, U_GFX_STEP,
     U_SAVE_PRESET, U_SAVE_BACKUP, U_SAVE_SLOT, U_SAVE_WRITE, U_SAVE_REFRESH,
     U_PERF_LOAD, U_PERF_WRITE, U_PERF_RESTORE, U_PERF_CHECK, U_PERF_VERIFY,
-    U_PERF_STEP, U_EXIT
+    U_PERF_STEP, U_EXIT,
+    U_RADIO_INSTALL, U_RADIO_RESTORE, U_RADIO_CHECK, U_RADIO_SCAN, U_RADIO_RECOVER, U_RADIO_HELP
 };
 static UiState g_ui;
 static UiView g_view;
@@ -46,6 +47,7 @@ static void modern_dialog(int type,const char *title,const char *body,UiEvent pe
 static void modern_report(const char *title,const char *body) {
     modern_dialog(2,title,body,modern_event(0,0));
 }
+#include "ui_radio.h"
 static void modern_sync(void) {
     if(g_ui.page==UI_MODS && g_ui.section==1) g_script_sel=g_ui.selected;
     if(g_ui.page==UI_DLC) {
@@ -67,6 +69,7 @@ static void modern_enter(int page,int section) {
     else if(page==UI_DLC) {g_tab=TAB_DLC;g_dlc_msg[0]=0;dlc_reload();dlc_scan_src();}
     else if(page==UI_GRAPHICS) {g_tab=TAB_GFX;if(!g_gfx_count) gfx_load();scan_switch_gfx_files();}
     else if(page==UI_SAVES) {g_tab=TAB_TOOL;modern_scan_saves();}
+    else if(page==UI_RADIO) {g_tab=TAB_TOOL;modern_radio_scan(section);}
     else if(page==UI_ADVANCED) {g_tab=TAB_PERF;if(!g_gc_opened) gc_open_rpf();}
     else g_tab=TAB_TOOL;
     modern_sync();
@@ -76,6 +79,7 @@ static void modern_section(int section) {
     g_ui.section=section;g_ui.selected=0;g_ui.scroll=0;g_ui.button=0;g_ui.focus=UI_SECTIONS;
     if(g_ui.page==UI_DLC && section==1) dlc_scan_src();
     if(g_ui.page==UI_GRAPHICS && section==2) scan_switch_gfx_files();
+    if(g_ui.page==UI_RADIO && section<2) modern_radio_scan(section);
     modern_sync();
 }
 static void modern_build(void) {
@@ -102,7 +106,7 @@ static void modern_build(void) {
             for(int i=0;i<gc_script_builtin_count();i++) {
                 const GcBuiltinMod *m=gc_script_builtin(i);char sub[192],note[384];
                 snprintf(sub,sizeof(sub),TR("作者 %s  /  %d 个脚本文件","By %s  /  %d script files"),m->author,m->n_files);
-                snprintf(note,sizeof(note),"%s\n%s",MOD_NOTE(m),TR("安装会覆盖同名脚本。互斥检测与回读校验自动执行，完成后重启游戏。","Installation replaces same-name scripts. Conflict checks and read-back verification run automatically. Restart the game afterwards."));
+                snprintf(note,sizeof(note),"%s\n%s",MOD_NOTE(m),TR("安装会覆盖同名脚本。共用槽位的模组会被替换，写入后校验，完成后重启游戏。","Installation replaces same-name scripts. Mods sharing the same slot are replaced; writes are verified. Restart the game afterwards."));
                 modern_row(MOD_TITLE(m),sub,TR("已内置","Bundled"),note,U_MOD_INSTALL,i,UI_ACCENT,0);
             }
         } else if(g_ui.section==1) {
@@ -189,6 +193,8 @@ static void modern_build(void) {
         const char *fn=strrchr(g_save_path,'/');fn=fn?fn+1:g_save_path;
         snprintf(g_ui_summary,sizeof(g_ui_summary),TR("目标槽位：%s  /  %s","Target slot: %s  /  %s"),fn[0]?fn:TR("未找到","Not found"),g_status_msg);
         g_view.status=g_ui_summary;g_view.status_tone=no_target?UI_ERROR:g_status_color;
+    } else if(g_ui.page==UI_RADIO) {
+        modern_radio_build();
     } else {
         g_view.title=TR("高级工具","Advanced tools");g_view.subtitle=TR("gameconfig 参数与诊断。参数调整不会自动提升硬件性能。","Gameconfig parameters and diagnostics. Changes cannot remove hardware limits.");
         g_view.section_count=2;g_view.sections[0]=TR("参数调整","Parameters");g_view.sections[1]=TR("维护诊断","Diagnostics");
@@ -243,6 +249,7 @@ static void modern_execute(UiEvent e,int confirmed) {
     if(e.action==UI_GO_SECTION) {modern_section(e.param);return;}
     if(e.action==UI_DIALOG_CANCEL) {g_ui_dialog=0;return;}
     if(e.action==UI_DIALOG_OK) {e=g_ui_pending;g_ui_dialog=0;confirmed=1;}
+    if(e.action>=U_RADIO_INSTALL && e.action<=U_RADIO_HELP) {modern_radio_execute(e,confirmed);return;}
     int mutates=e.action==U_MOD_INSTALL||e.action==U_MOD_RESTORE||e.action==U_SCRIPT_INSTALL||e.action==U_SCRIPT_REMOVE||
         e.action==U_DLC_TOGGLE||e.action==U_DLC_IMPORT||e.action==U_DLC_DELETE||e.action==U_DLC_CONVERT||e.action==U_DLC_HD||
         e.action==U_GFX_PRESET||e.action==U_GFX_IMPORT||e.action==U_GFX_SAVE||e.action==U_SAVE_PRESET||e.action==U_SAVE_BACKUP||

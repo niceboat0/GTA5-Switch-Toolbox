@@ -17,6 +17,8 @@
  *   · 落点必须 512 对齐（RPF 的 offset 字段是扇区号）
  */
 #include "gc_script.h"
+#include "gc_nsc.h"
+#include "lang.h"
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -124,6 +126,7 @@ static int read_hdr(FILE *f, long long base, Hdr *h) {
     h->nl = raw & 0x0FFFFFFFu;
     h->shift = raw >> 28;
     h->enc = rd_u32(b + 12);            /* ★ P1: 读加密类型 */
+    if (h->enc != 0x4e45504fu || h->shift != 0) return -1;
     if (h->ec == 0 || h->ec > MAX_TOP_ENT) return -1;
     if (h->nl == 0 || h->nl > 4u * 1024u * 1024u) return -1;
     h->names_off = base + 16 + (long long)h->ec * 16;
@@ -212,7 +215,7 @@ typedef struct {
     u8 *toc;      /* ec*16 */
     u8 *names;    /* nl */
     int idx_same; /* 已存在的同名条目索引，-1 = 无 */
-    int root_first, root_count;
+    int root_first, root_count; /* root_first stores the root entry INDEX */
 } RelInfo;
 
 static void rel_free(RelInfo *ri) { free(ri->toc); free(ri->names); ri->toc = ri->names = NULL; }
@@ -235,7 +238,9 @@ static int rel_load(FILE *f, long long base, RelInfo *ri, const char *want_name)
         int is_res = (int)((q0 >> 63) & 1);
         u32 off = (u32)((q0 >> 40) & 0x7FFFFF);
         if (!is_res && off == 0x7FFFFF) {
-            ri->root_first = (int)rd_u32(ri->toc + i * 16 + 8);
+            if (i != 0 || rd_u32(ri->toc + 8) != 1 ||
+                rd_u32(ri->toc + 12) != ri->h.ec-1) { rel_free(ri);return -1; }
+            ri->root_first = (int)i; /* index of directory entry, not its first child */
             ri->root_count = (int)rd_u32(ri->toc + i * 16 + 12);
             continue;
         }
@@ -388,6 +393,11 @@ int gc_script_install(const char *nsc_path, const char *entry_name,
         free(raw); fclose(r); set_err(err, errsz, "读取不完整"); return GC_SCRIPT_ERR_READ;
     }
     fclose(r);
+
+    /* Validate before opening the game archive for writes. */
+    if (gc_nsc_decode_validate(raw,(size_t)rlen,ename,err,errsz)!=0) {
+        free(raw);return GC_SCRIPT_ERR_READ;
+    }
 
     /* ---- 2. 判定数据类型：RSC7 资源条目 还是 裸 Switch payload ----
      *   RSC7 ⇒ 原样写（内部已是 deflate），TOC 置 is_res=1
@@ -582,7 +592,7 @@ int gc_script_install(const char *nsc_path, const char *entry_name,
          * "平移空间不足"（2026-10-07 用户实测：空隙仅 60KB）。
          * 文件末尾空间无限且无既有数据可撞，永远安全。 */
         long long mv_dst = (fsz + 511) / 512 * 512;
-        long long mv_src = first_data;   /* 绝对偏移（base 已含） */
+        long long mv_src = base + first_data; /* inner offsets are relative */
         /* 平移目标必须在新数据之后（不覆盖刚写的新 mod 数据）；
          * write_at 已是文件末尾方向时 mv_dst 天然 >= write_at+need */
         if (mv_dst < write_at + (long long)need)
@@ -617,7 +627,7 @@ int gc_script_install(const char *nsc_path, const char *entry_name,
             return GC_SCRIPT_ERR_IO;
         }
         /* 改该条目 TOC 偏移 → 平移后的新位置（扇区号） */
-        u32 mv_sec = (u32)(mv_dst / 512);
+        u32 mv_sec = (u32)((mv_dst - base) / 512);
         if (mv_sec > 0x7FFFFF) {
             if (new_names != ri.names) free(new_names);
             if (new_toc != ri.toc) free(new_toc);
@@ -639,14 +649,14 @@ int gc_script_install(const char *nsc_path, const char *entry_name,
     }
 
     /* 🚨 先写 names 再写 TOC */
-    if (fseeko(f, base + 16 + (long long)new_ec * 16, SEEK_SET) == 0 &&
+    if (fseeko(f, base + 16 + (long long)new_ec * 16, SEEK_SET) != 0 ||
         fwrite(new_names, 1, new_nl, f) != new_nl) {
         if (new_names != ri.names) free(new_names);
         if (new_toc != ri.toc) free(new_toc);
         rel_free(&ri); free_bufs(raw, comp); fclose(f);
         set_err(err, errsz, "写 names 失败"); return GC_SCRIPT_ERR_IO;
     }
-    if (fseeko(f, base + 16, SEEK_SET) == 0 &&
+    if (fseeko(f, base + 16, SEEK_SET) != 0 ||
         fwrite(new_toc, 1, (size_t)new_ec * 16, f) != (size_t)new_ec * 16) {
         if (new_names != ri.names) free(new_names);
         if (new_toc != ri.toc) free(new_toc);
@@ -657,7 +667,7 @@ int gc_script_install(const char *nsc_path, const char *entry_name,
     u8 hb[8];
     wr_u32(hb, new_ec);
     wr_u32(hb + 4, (u32)(((u32)ri.h.shift << 28) | (new_nl & 0x0FFFFFFFu)));
-    if (fseeko(f, base + 4, SEEK_SET) == 0 && fwrite(hb, 1, 8, f) != 8) {
+    if (fseeko(f, base + 4, SEEK_SET) != 0 || fwrite(hb, 1, 8, f) != 8) {
         if (new_names != ri.names) free(new_names);
         if (new_toc != ri.toc) free(new_toc);
         rel_free(&ri); free_bufs(raw, comp); fclose(f);
@@ -668,8 +678,14 @@ int gc_script_install(const char *nsc_path, const char *entry_name,
     if (rel_idx >= 0 && new_osize != osize) {
         u8 sb[4];
         wr_u32(sb, new_osize);
-        if (fseeko(f, 0x10 + (long long)rel_idx * 16 + 8, SEEK_SET) == 0)
-            (void)fwrite(sb, 1, 4, f);
+        if (fseeko(f, 0x10 + (long long)rel_idx * 16 + 8, SEEK_SET) != 0 ||
+            fwrite(sb, 1, 4, f) != 4) {
+            if (new_names != ri.names) free(new_names);
+            if (new_toc != ri.toc) free(new_toc);
+            rel_free(&ri); free_bufs(raw, comp); fclose(f);
+            set_err(err,errsz,TR("更新外层脚本条目失败","Failed to update outer script entry"));
+            return GC_SCRIPT_ERR_IO;
+        }
     }
 
     if (new_names != ri.names) free(new_names);
@@ -677,9 +693,12 @@ int gc_script_install(const char *nsc_path, const char *entry_name,
     rel_free(&ri);
     free_bufs(raw, comp);
 
-    fflush(f);
-    fsdevCommitDevice("sdmc");
-    fclose(f);
+    int flush_failed = fflush(f) != 0;
+    int close_failed = fclose(f) != 0;
+    if (flush_failed || close_failed || R_FAILED(fsdevCommitDevice("sdmc"))) {
+        set_err(err,errsz,TR("脚本写入未能提交到 SD 卡","Script write could not be committed to SD"));
+        return GC_SCRIPT_ERR_IO;
+    }
 
     printf("[script] 安装完成: %s (%s)\n", ename, is_new ? "新增" : "替换");
     (void)extend_file;
@@ -770,7 +789,9 @@ int gc_script_uninstall(const char *entry_name, char *err, size_t errsz) {
     int rf = ri.root_first, rc = ri.root_count;
     if (rf > (int)ri.idx_same) rf -= 1;
     if (rf >= 0 && rf < (int)new_ec && rc > 0) {
-        wr_u32(ri.toc + (size_t)rf * 16 + 8,  (u32)rf);        /* first 保持不变语义 */
+        u32 child = rd_u32(ri.toc + (size_t)rf * 16 + 8);
+        if (child > (u32)ri.idx_same) --child;
+        wr_u32(ri.toc + (size_t)rf * 16 + 8, child);
         wr_u32(ri.toc + (size_t)rf * 16 + 12, (u32)(rc - 1));  /* count -1 */
     }
 
@@ -807,9 +828,12 @@ int gc_script_uninstall(const char *entry_name, char *err, size_t errsz) {
     }
     rel_free(&ri);
 
-    fflush(f);
-    fsdevCommitDevice("sdmc");
-    fclose(f);
+    int flush_failed = fflush(f) != 0;
+    int close_failed = fclose(f) != 0;
+    if (flush_failed || close_failed || R_FAILED(fsdevCommitDevice("sdmc"))) {
+        set_err(err, errsz, TR("删除后的 SD 提交失败", "SD commit failed after removal"));
+        return GC_SCRIPT_ERR_IO;
+    }
     printf("[script] 已删除 %s（内层条目 %u）\n", entry_name, new_ec);
     return GC_SCRIPT_OK;
 }
@@ -892,23 +916,9 @@ int gc_script_restore_stock(const char *entry_name, char *err, size_t errsz) {
 /* ========================================================================= */
 /* ★ v6.2: 内置模组 —— 打进 NRO romfs，一键安装，免插卡拷文件                 */
 /* ========================================================================= */
-/* ★★ 2026-10-01 晚【重要更正】：ragemenu 只需要【一个壳】！
- *
- *   ragemenu.nsc              本体（新建条目）
- *   achievement_controller.nsc 借壳加载器（字节码里含 joaat("ragemenu")=0x4BD26EEF ×4）
- *
- *   ❌ 早先照抄 MEGATARD 的 `how to install.txt`（它列了 3 个文件，含
- *      shop_controller.nsc），把 shop_controller 也打进内置包 —— **多余**。
- *      实证（用户指出 + 字节码复核）：
- *        ① ragemenu.nsc / achievement_controller.nsc 的 payload 里
- *           **完全没有 joaat("shop_controller")=0x39DA738B 的引用**
- *        ② 用户实际装机用的 `GTA5switch修改器版本0.9.9开菜单 L+↓.zip`
- *           里**只有 achievement_controller.nsc + ragemenu.nsc 两个文件**
- *        ③ 作者仓库里那份 shop_controller.nsc（2,129,920 B）躺在
- *           `MEGATARD_nsc/_stock_ref/` 里 —— 那是**给 SC-CL 做 PC→Switch
- *           转换时当"同版本 stock 参考"用的**（拷头 8 字节 / 0x18 处 4 字节），
- *           **不是要装进游戏的**。且它与官方解压出的 payload 内容并不相同。
- *      ⇒ 装模组只写 2 个条目。NRO 体积因此省下 2.03 MB。
+/* MEGATARD v1.0.5 bundles the author's current three-file deployment:
+ * ragemenu.nsc, achievement_controller.nsc and shop_controller.nsc.
+ * Classic ragemenu retains its original two-file bundle.
  *
  * HotCoffee-NX 也是【一对】文件，但★有 cinnamon / combo 两个版本★：
  *   error_listener.nsc         加载器（含 joaat("simple_zombies")×4）
@@ -926,10 +936,18 @@ typedef struct { const char *entry; const char *src; } GcModFile;
 static const GcModFile MF_MEGATARD[] = {
     { "ragemenu.nsc",               "romfs:/builtin_mods/megatard/ragemenu.nsc" },
     { "achievement_controller.nsc", "romfs:/builtin_mods/megatard/achievement_controller.nsc" },
+    { "shop_controller.nsc",        "romfs:/builtin_mods/megatard/shop_controller.nsc" },
 };
 static const GcModFile MF_CLASSIC[] = {
     { "ragemenu.nsc",               "romfs:/builtin_mods/classic/ragemenu.nsc" },
     { "achievement_controller.nsc", "romfs:/builtin_mods/classic/achievement_controller.nsc" },
+    { "shop_controller.nsc",        "romfs:/stock_scripts/shop_controller.nsc" },
+};
+/* User-supplied original English menu; the classic loader starts ragemenu. */
+static const GcModFile MF_CLASSIC_EN[] = {
+    { "ragemenu.nsc",               "romfs:/builtin_mods/classic_en/ragemenu.nsc" },
+    { "achievement_controller.nsc", "romfs:/builtin_mods/classic/achievement_controller.nsc" },
+    { "shop_controller.nsc",        "romfs:/stock_scripts/shop_controller.nsc" },
 };
 /* 热咖啡 + 丧尸（combo 版） */
 static const GcModFile MF_HC_COMBO[] = {
@@ -956,14 +974,18 @@ typedef struct {
 } GcBuiltinModDef;
 
 static const GcBuiltinModDef S_MODS[] = {
-    { "megatard",  "MEGATARD v0.9.9 汉化", "MEGATARD v0.9.9 (ZH)", "Geekmaxxer",
-      "与「经典 ragemenu」互斥（都占 ragemenu）",
-      "Mutually exclusive with Classic ragemenu (both use the ragemenu slot)",
+    { "megatard",  "MEGATARD v1.0.5（支持中文）", "MEGATARD v1.0.5 (multilingual)", "MEGATARD",
+      "菜单设置可切换中文；与经典 ragemenu 共用槽位，安装会替换",
+      "Chinese available in menu settings; replaces Classic ragemenu in the same slot",
       MF_MEGATARD,  MF_N(MF_MEGATARD) },
     { "classic",   "经典 ragemenu 简体 10月7日版", "Classic ragemenu Oct 7 (ZH)", "maritoguionyo",
-      "与「MEGATARD」互斥（都占 ragemenu）",
-      "Mutually exclusive with MEGATARD (both use the ragemenu slot)",
+      "替换英文版 / MEGATARD，并恢复官方 shop_controller",
+      "Replaces English / MEGATARD and restores stock shop_controller",
       MF_CLASSIC,   MF_N(MF_CLASSIC) },
+    { "classic_en", "经典 ragemenu 原版英文", "Classic ragemenu (original English)", "maritoguionyo",
+      "用户提供的原版；替换汉化版 / MEGATARD，并恢复官方 shop_controller",
+      "User-supplied original; replaces ZH / MEGATARD and restores stock shop_controller",
+      MF_CLASSIC_EN, MF_N(MF_CLASSIC_EN) },
     { "hc_combo",  "热咖啡 + 丧尸", "Hot Coffee + Zombies", "Je11yb0ne/CinnamonCoffee",
       "含丧尸模组；与下一项互斥（都占 simple_zombies）",
       "Includes the zombies mod; mutually exclusive with the next entry (both use simple_zombies)",

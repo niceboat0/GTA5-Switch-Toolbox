@@ -21,7 +21,15 @@ SD卡:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf    （约 7
 
 工具内的「还原官方脚本」只还原 3 个脚本条目，**不能替代完整备份**。
 
-## 功能与操作（v7.0）
+## v7.1 电台与内置模组
+
+- MEGATARD 更新至 v1.0.5，支持中文和菜单语言切换，采用上游的三个脚本文件。
+- 新增 **经典 ragemenu 原版英文**，作者 **maritoguionyo**，由用户提供原始 `ragemenu.nsc`。与经典汉化版、MEGATARD 共用槽位；选择安装会替换当前版本。经典版安装同时恢复官方 `shop_controller.nsc`，清理 MEGATARD 的对应脚本。
+- 侧栏新增「电台」：自定义电台、替换原电台、使用说明。提供来源哈希检查、目标内容检查、备份、还原和中断恢复。
+- **未内置 Self Radio 运行包**，NRO 单独安装不会启用电台。作者 v1.1 下载目录检查时为空；取得匹配运行包后，按 [电台说明](docs/RADIO.zh.md) 准备安装包。
+- 模组和电台仍需实机验证。主机测试使用临时 RPF，不能证明游戏内运行正常。
+
+## 功能与操作（v7.1）
 
 原生 1280×720 界面：固定侧栏、总览入口、分区列表、所选内容说明、统一操作栏。
 中英文自动跟随系统语言，兼容手柄与触屏，无需额外界面库。
@@ -66,7 +74,8 @@ PC 格式会明确标记并阻止直接导入；请先完成 Switch 格式转换
 
 | 模组 | 作者 | 槽位 |
 |---|---|---|
-| MEGATARD v0.9.9 汉化 | Geekmaxxer | ragemenu |
+| MEGATARD v1.0.5（支持中文） | MEGATARD / Geekmaxxer 分支提供 | ragemenu |
+| 经典 ragemenu 原版英文 | maritoguionyo | ragemenu |
 | 经典 ragemenu 简体 10月7日版 | maritoguionyo | ragemenu（与上互斥） |
 | 热咖啡+丧尸 | Je11yb0ne/CinnamonCoffee | simple_zombies |
 | 热咖啡（不含丧尸） | Je11yb0ne/CinnamonCoffee | simple_zombies（与上互斥） |
@@ -86,7 +95,7 @@ make
 ## 致谢
 
 - **[Geekmaxxer](https://github.com/Geekmaxxer)** —— [MEGATARD GTA5-NX Menu SDK](https://github.com/Geekmaxxer/GTA5NX-MG-Menu)
-  （MEGATARD v0.9.9 原作者）、[GTA5-NX-Tutorial](https://geekmaxxer.github.io/GTA5-NX-Tutorial/) 教程站、
+  （MEGATARD v1.0.5 原作者）、[GTA5-NX-Tutorial](https://geekmaxxer.github.io/GTA5-NX-Tutorial/) 教程站、
   [RPF Radio Editor](https://github.com/Geekmaxxer/gta-radio-editor)
 - **[Je11yb0ne](https://github.com/Je11yb0ne)** —— [HotCoffee-NX](https://github.com/Je11yb0ne/HotCoffee-NX)
   （CinnamonCoffee 的 Switch 移植，含热咖啡+丧尸两个版本）
