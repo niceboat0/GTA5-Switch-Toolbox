@@ -22,7 +22,8 @@ enum { UI_UP=1, UI_DOWN=2, UI_LEFT=4, UI_RIGHT=8, UI_ACCEPT=16,
        UI_ACTIONS=32, UI_PREV=64, UI_NEXT=128, UI_BACK=256 };
 /* Reserved presentation events. Backend commands use positive values. */
 enum { UI_NO_EVENT=0, UI_GO_PAGE=-1, UI_GO_SECTION=-2, UI_SELECT_ROW=-3,
-       UI_RUN_ROW=-4, UI_RUN_BUTTON=-5, UI_DIALOG_OK=-6, UI_DIALOG_CANCEL=-7 };
+       UI_RUN_ROW=-4, UI_RUN_BUTTON=-5, UI_DIALOG_OK=-6, UI_DIALOG_CANCEL=-7,
+       UI_BROWSE_PAGE=-8 }; /* Open a page while retaining sidebar focus. */
 
 typedef struct { int action, param; } UiEvent;
 typedef struct {

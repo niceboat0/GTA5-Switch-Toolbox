@@ -87,6 +87,13 @@ static void modern_section(int section) {
     if(g_ui.page==UI_RADIO && section<2) modern_radio_scan(section);
     modern_sync();
 }
+static int modern_navigate(UiEvent e) {
+    if(e.action!=UI_GO_PAGE && e.action!=UI_BROWSE_PAGE)return 0;
+    if(e.param<0 || e.param>=UI_PAGE_COUNT)return 1;
+    if(e.param!=g_ui.page || e.action==UI_GO_PAGE)modern_enter(e.param,0);
+    if(e.action==UI_BROWSE_PAGE) {g_ui.focus=UI_SIDEBAR;g_ui.sidebar=e.param;}
+    return 1;
+}
 static void modern_build(void) {
     memset(&g_view,0,sizeof(g_view));
     g_view.page=g_ui.page;g_view.section=g_ui.section;g_view.en=g_lang_en;
@@ -237,7 +244,7 @@ static void modern_execute(UiEvent e,int confirmed) {
     if(g_ui_dialog && e.action!=UI_DIALOG_OK && e.action!=UI_DIALOG_CANCEL) return;
     if(e.action==UI_DIALOG_OK && g_ui_dialog!=1) return;
     if(e.action==UI_NO_EVENT) return;
-    if(e.action==UI_GO_PAGE) {modern_enter(e.param,0);return;}
+    if(modern_navigate(e))return;
     if(e.action==UI_GO_SECTION) {modern_section(e.param);return;}
     if(e.action==UI_SELECT_ROW) {
         if(e.param>=0 && e.param<g_view.row_count) {g_ui.selected=e.param;g_ui.focus=UI_LIST;modern_sync();}
@@ -251,7 +258,7 @@ static void modern_execute(UiEvent e,int confirmed) {
         if(!g_view.row_count || g_view.rows[g_ui.selected].disabled) return;
         e=g_view.rows[g_ui.selected].event;
     }
-    if(e.action==UI_GO_PAGE) {modern_enter(e.param,0);return;}
+    if(modern_navigate(e))return;
     if(e.action==UI_GO_SECTION) {modern_section(e.param);return;}
     if(e.action==UI_DIALOG_CANCEL) {g_ui_dialog=0;return;}
     if(e.action==UI_DIALOG_OK) {e=g_ui_pending;g_ui_dialog=0;confirmed=1;}

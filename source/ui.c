@@ -161,7 +161,12 @@ UiEvent ui_input(UiState *s,const UiView *v,unsigned keys) {
     if(s->focus==UI_SIDEBAR) {
         if(keys&UI_UP) s->sidebar=(s->sidebar+UI_PAGE_COUNT-1)%UI_PAGE_COUNT;
         else if(keys&UI_DOWN) s->sidebar=(s->sidebar+1)%UI_PAGE_COUNT;
-        if(keys&(UI_RIGHT|UI_ACCEPT)) return event(UI_GO_PAGE,s->sidebar);
+        if(keys&UI_RIGHT) {
+            if(s->sidebar!=s->page)return event(UI_GO_PAGE,s->sidebar);
+            s->focus=v->row_count?UI_LIST:v->button_count?UI_BUTTONS:UI_SECTIONS;
+            ui_clamp(s,v);return event(0,0);
+        }
+        if(keys&UI_ACCEPT) return event(UI_BROWSE_PAGE,s->sidebar);
         return event(0,0);
     }
     if(keys&UI_ACTIONS) {
@@ -253,7 +258,7 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
         hit(c,16,y,196,49,UI_GO_PAGE,i);
     }
     text(c,30,617,13,"GTA5 SWITCH TOOLBOX",UI_MUTED);
-    text(c,30,642,12,"v7.2.0",UI_MUTED);
+    text(c,30,642,12,"v7.2.1",UI_MUTED);
     text(c,30,680,12,T(v,"L / R  切换页面","L / R  Switch page"),UI_MUTED);
 
     if(s->page==UI_HOME) {
@@ -270,7 +275,7 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
             icon(c,x+24,y+24,i+1,UI_ACCENT);
             fit(c,x+65,y+22,24,380,v->rows[i].title,UI_TEXT);
             fit(c,x+24,y+68,16,430,v->rows[i].subtitle,UI_MUTED);
-            text(c,x+24,y+102,12,sel?T(v,"A  打开工作空间","A  Open workspace"):"GTA V / SWITCH",sel?UI_ACCENT:UI_MUTED);
+            text(c,x+24,y+102,12,sel && s->focus==UI_LIST?T(v,"A  打开工作空间","A  Open workspace"):"GTA V / SWITCH",sel && s->focus==UI_LIST?UI_ACCENT:UI_MUTED);
             hit(c,x,y,478,131,UI_GO_PAGE,v->rows[i].event.param);
         }
         fit(c,264,594,15,980,v->subtitle,UI_MUTED);
@@ -336,7 +341,9 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
     }
     rect(c,264,665,980,1,LINE);
     fit(c,264,637,14,980,v->status,v->status_tone?v->status_tone:UI_MUTED);
-    text(c,264,682,14,T(v,"左 / B  侧栏    上下  选择    右 / A  打开    X  操作栏    触屏滑动列表","Left / B  Sidebar    Up / Down  Select    Right / A  Open    X  Actions    Swipe lists"),UI_MUTED);
+    text(c,264,682,14,s->focus==UI_SIDEBAR?
+        T(v,"上下  选页面    A  打开并留在侧栏    右  进入内容区    B  总览","Up / Down  Choose page    A  Open, keep sidebar focus    Right  Content    B  Overview"):
+        T(v,"左 / B  侧栏    上下  选择    A  确认    X  操作栏    触屏滑动列表","Left / B  Sidebar    Up / Down  Select    A  Confirm    X  Actions    Swipe lists"),UI_MUTED);
     if(v->dialog) {
         /* A solid scrim also prevents visually reading the background as active. */
         rect(c,228,0,1052,720,UI_BG);

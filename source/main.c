@@ -21,6 +21,7 @@
 #include "gc_script.h"   /* ★ v5.0: 脚本 mod（.nsc）安装 */
 #include "gc_presets.h"
 #include "ui.h"
+#include "ui_navigation.h"
 #include "lang.h"        /* ★ v6.3: 双语 TR() 宏 */
 
 /* 屏幕分辨率 */
@@ -131,19 +132,6 @@ static void touch_poll(void) {
     memset(&g_touch,0,sizeof(g_touch));hidGetTouchScreenStates(&g_touch,1);
 }
 
-/* 摇杆方向 -> 方向键位（超出阈值即模拟方向键）
- * ★ v28: 阈值 8000->4000（更灵敏）
- * ★ v31: 参数化 -- 左摇杆(0) / 右摇杆(1) 共用；用户要求【右摇杆与左摇杆功能完全一致】 */
-#define JOY_THRESHOLD 4000
-static u32 joy_to_dpad(int idx) {
-    HidAnalogStickState st = padGetStickPos(&g_pad, idx);
-    u32 bits = 0;
-    if (st.x > JOY_THRESHOLD) bits |= HidNpadButton_Right;
-    if (st.x < -JOY_THRESHOLD) bits |= HidNpadButton_Left;
-    if (st.y > JOY_THRESHOLD) bits |= HidNpadButton_Up;
-    if (st.y < -JOY_THRESHOLD) bits |= HidNpadButton_Down;
-    return bits;
-}
 static u32        g_stride_words = 0;
 
 /* 绘制矩形 */
@@ -4058,22 +4046,18 @@ int main(int argc, char **argv) {
     load_initial_save();
     ui_reset(&g_ui, UI_HOME, 0);
     modern_build();
-    u32 last_direction=0;
-    int direction_ticks=0, adjust_dir=0, adjust_ticks=0;
+    UiNavigation navigation={0};
+    int adjust_dir=0, adjust_ticks=0;
     while(g_ui_running && appletMainLoop()) {
         padUpdate(&g_pad);
         u32 down=padGetButtonsDown(&g_pad), held=padGetButtons(&g_pad);
-        u32 directions=(held | joy_to_dpad(0) | joy_to_dpad(1)) &
-            (HidNpadButton_Up|HidNpadButton_Down|HidNpadButton_Left|HidNpadButton_Right);
-        u32 move=0;
-        if(directions!=last_direction) { move=directions;direction_ticks=0; }
-        else if(directions && ++direction_ticks>=20 && direction_ticks%6==0) move=directions;
-        last_direction=directions;
-        unsigned keys=0;
-        if(move&HidNpadButton_Up) keys|=UI_UP;
-        if(move&HidNpadButton_Down) keys|=UI_DOWN;
-        if(move&HidNpadButton_Left) keys|=UI_LEFT;
-        if(move&HidNpadButton_Right) keys|=UI_RIGHT;
+        unsigned dpad=0;
+        if(held&HidNpadButton_Up)dpad|=UI_UP;
+        if(held&HidNpadButton_Down)dpad|=UI_DOWN;
+        if(held&HidNpadButton_Left)dpad|=UI_LEFT;
+        if(held&HidNpadButton_Right)dpad|=UI_RIGHT;
+        HidAnalogStickState left=padGetStickPos(&g_pad,0),right=padGetStickPos(&g_pad,1);
+        unsigned keys=ui_navigation_step(&navigation,left.x,left.y,right.x,right.y,dpad,svcGetSystemTick()/19200ULL);
         if(down&HidNpadButton_A) keys|=UI_ACCEPT;
         if(down&HidNpadButton_B) keys|=UI_BACK;
         if(down&HidNpadButton_X) keys|=UI_ACTIONS;

@@ -116,3 +116,7 @@ The new Radio workspace installs verified Self Radio packages or paired Radio Ed
 Swipe lists and detailed reports. Taps activate once on release; dragging or adding a second finger cancels the tap. Press Left or B to focus the sidebar, Up/Down to choose a page, and Right or A to open it. B from the sidebar returns to Overview. Both sticks and the D-pad work; L/R shortcuts remain available. Page changes use a short 160 ms fade and offset while input remains active.
 
 DLC folders load in bounded batches, with cached reentry and visible-item resource probes. Rescan after changing files externally. Inspect lists vehicle model/spawn names and checks each base/_hi pair for installed or import-source packs. It reads directory data and necessary nested containers instead of loading whole DLC archives. Partial inspection is explicitly reported; names and pairing do not prove in-game compatibility.
+
+## v7.2.1 stick and sidebar focus
+
+Stick activation dead zone increases from 4000 to 12000, with release hysteresis at 8000 and dominant-axis filtering. Holding waits 450 ms before repeating at 180 ms intervals; both sticks follow the same rule. B still enters the sidebar and A still opens a page, retaining sidebar focus. Press Right explicitly to enter the content area. Pressing A on the active page does not reload it.

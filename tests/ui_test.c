@@ -62,7 +62,9 @@ int main(void) {
     ui_input(&s,&view,UI_DOWN);assert(s.sidebar==UI_GRAPHICS && s.selected==7 && s.scroll==4);
     e=ui_input(&s,&view,UI_RIGHT);assert(e.action==UI_GO_PAGE && e.param==UI_GRAPHICS);
     s.sidebar=0;ui_input(&s,&view,UI_UP);assert(s.sidebar==UI_ADVANCED);
-    e=ui_input(&s,&view,UI_ACCEPT);assert(e.action==UI_GO_PAGE && e.param==UI_ADVANCED);
+    e=ui_input(&s,&view,UI_ACCEPT);assert(e.action==UI_BROWSE_PAGE && e.param==UI_ADVANCED && s.focus==UI_SIDEBAR);
+    s.sidebar=s.page;e=ui_input(&s,&view,UI_ACCEPT);assert(e.action==UI_BROWSE_PAGE && e.param==s.page && s.focus==UI_SIDEBAR);
+    e=ui_input(&s,&view,UI_RIGHT);assert(!e.action && s.focus==UI_LIST && s.selected==7);
     s.focus=UI_SECTIONS;s.section=0;ui_input(&s,&view,UI_LEFT);assert(s.focus==UI_SIDEBAR);
     s.focus=UI_BUTTONS;s.button=0;ui_input(&s,&view,UI_LEFT);assert(s.focus==UI_SIDEBAR);
     s.focus=UI_LIST;ui_input(&s,&view,UI_BACK);assert(s.focus==UI_SIDEBAR);
@@ -99,6 +101,6 @@ int main(void) {
     fixture(UI_MODS,4);ui_reset(&s,UI_MODS,0);view.dialog=1;view.dialog_title="Confirm";view.dialog_body="A specific change to a specific target.";
     hits=blocked=0;ui_render(&c,&s,&view);assert(blocked && hits==blocked+2 && last_hit==UI_DIALOG_OK);
     view.dialog=2;hits=blocked=0;ui_render(&c,&s,&view);assert(hits==blocked+1 && last_hit==UI_DIALOG_CANCEL);
-    puts("UI navigation, disabled actions, scrolling, bilingual layout and modal shielding passed.");
+    puts("UI navigation, sidebar A focus retention, disabled actions, scrolling, bilingual layout and modal shielding passed.");
     return 0;
 }

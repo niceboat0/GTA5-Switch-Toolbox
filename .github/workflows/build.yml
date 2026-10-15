@@ -16,6 +16,8 @@ jobs:
           mkdir -p build
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g source/ui.c tests/ui_test.c -o build/ui-test
           ./build/ui-test
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g source/ui_navigation.c tests/navigation_test.c -o build/navigation-test
+          ./build/navigation-test
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g source/save_backup.c tests/save_backup_test.c -o build/save-backup-test
           ./build/save-backup-test
       - name: Exercise script, package and exporter backends
