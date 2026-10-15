@@ -918,7 +918,7 @@ int gc_script_restore_stock(const char *entry_name, char *err, size_t errsz) {
 /* ========================================================================= */
 /* MEGATARD v1.0.5 bundles the author's current three-file deployment:
  * ragemenu.nsc, achievement_controller.nsc and shop_controller.nsc.
- * Classic ragemenu retains its original two-file bundle.
+ * Classic ragemenu uses its original loader and restores stock shop_controller.
  *
  * HotCoffee-NX 也是【一对】文件，但★有 cinnamon / combo 两个版本★：
  *   error_listener.nsc         加载器（含 joaat("simple_zombies")×4）

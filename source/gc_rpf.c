@@ -1315,4 +1315,3 @@ int gc_xml_set_int_ex(char *xml, size_t cap, size_t *len,
     if (inserted) *inserted = ins;
     return GC_OK;
 }
-

@@ -26,7 +26,7 @@ def compile_library(root, output, zlib_source):
         args += [str(definitions.resolve())]
     else:args += ['-fPIC','-Wno-deprecated-declarations']
     args += [str(x) for x in sources]+['-o',str(library.resolve())]+(['-lbcrypt'] if os.name=='nt' else ['-lz','-lcrypto'])
-    run=subprocess.run(args,capture_output=True,text=True)
+    run=subprocess.run(args,capture_output=True,text=True,encoding="utf-8",errors="replace")
     (output/'compile.log').write_text(run.stdout+run.stderr)
     if run.returncode:raise RuntimeError(run.stdout+run.stderr)
     return ctypes.CDLL(str(library.resolve()))

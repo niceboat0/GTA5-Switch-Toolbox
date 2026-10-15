@@ -1,8 +1,5 @@
 #include <stdio.h>
 #include <errno.h>
-#ifndef _WIN32
-#define __declspec(x)
-#endif
 int g_lang_en=1;
 char gc_host_archive_path[1024];
 void gc_host_set_archive(const char *p) {
