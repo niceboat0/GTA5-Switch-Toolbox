@@ -22,8 +22,10 @@
 #define GC_SCRIPT_NAME_MAX 96
 
 /* update2.rpf 与内层脚本容器 */
+#ifndef GC_SCRIPT_UPDATE2
 #define GC_SCRIPT_UPDATE2 \
     "sdmc:/atmosphere/contents/0100b00b51230000/romfs/update/update2.rpf"
+#endif
 #define GC_SCRIPT_REL_RPF "script_rel.rpf"
 
 /* 一个已装脚本条目 */

@@ -1,3 +1,4 @@
+#include <strings.h>
 /* gc_rpf.c —— RPF7 单条目原位替换实现
  *
  * 核心算法（已验证于真实 889 MB update.rpf）：
