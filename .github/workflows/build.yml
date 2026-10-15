@@ -25,6 +25,8 @@ jobs:
           python3 tests/test_scripts.py --output build/scripts
           python3 tests/test_packages.py --output build/packages
           python3 tests/test_exporter.py --output build/exporter
+          python3 tests/test_vehicles.py --output build/vehicles
+          python3 tests/test_catalog.py --output build/catalog
   switch:
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:20260219

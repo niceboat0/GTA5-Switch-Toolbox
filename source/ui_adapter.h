@@ -14,10 +14,13 @@ enum {
     U_RADIO_INSTALL, U_RADIO_RESTORE, U_RADIO_CHECK, U_RADIO_SCAN, U_RADIO_RECOVER, U_RADIO_HELP
 };
 static UiState g_ui;
+static UiTouch g_ui_touch;
+static u64 g_ui_transition_tick;
+static int g_ui_transition_alpha=255,g_ui_transition_x;
 static UiView g_view;
 static int g_ui_running=1, g_ui_dialog=0, g_ui_report_scroll=0, g_ui_report_max=0;
 static UiEvent g_ui_pending;
-static char g_ui_dialog_title[160],g_ui_dialog_body[8192],g_ui_summary[256];
+static char g_ui_dialog_title[160],g_ui_dialog_body[65536],g_ui_summary[256];
 static const int UI_GFX_ORDER[]={2,4,3,5,0,1};
 
 static UiEvent modern_event(int action,int param) { UiEvent e={action,param};return e; }
@@ -47,6 +50,7 @@ static void modern_dialog(int type,const char *title,const char *body,UiEvent pe
 static void modern_report(const char *title,const char *body) {
     modern_dialog(2,title,body,modern_event(0,0));
 }
+#include "ui_dlc.h"
 #include "ui_radio.h"
 static void modern_sync(void) {
     if(g_ui.page==UI_MODS && g_ui.section==1) g_script_sel=g_ui.selected;
@@ -64,9 +68,10 @@ static void modern_scan_saves(void) {
 }
 static void modern_enter(int page,int section) {
     if(page<0 || page>=UI_PAGE_COUNT) return;
+    if(page!=g_ui.page) g_ui_transition_tick=svcGetSystemTick();
     ui_reset(&g_ui,page,section);
     if(page==UI_MODS) {g_tab=TAB_SCRIPT;g_dlc_msg[0]=0;script_scan();}
-    else if(page==UI_DLC) {g_tab=TAB_DLC;g_dlc_msg[0]=0;dlc_reload();dlc_scan_src();}
+    else if(page==UI_DLC) {g_tab=TAB_DLC;modern_dlc_request(section,0);}
     else if(page==UI_GRAPHICS) {g_tab=TAB_GFX;if(!g_gfx_count) gfx_load();scan_switch_gfx_files();}
     else if(page==UI_SAVES) {g_tab=TAB_TOOL;modern_scan_saves();}
     else if(page==UI_RADIO) {g_tab=TAB_TOOL;modern_radio_scan(section);}
@@ -77,7 +82,7 @@ static void modern_enter(int page,int section) {
 static void modern_section(int section) {
     if(section<0 || section>=g_view.section_count) return;
     g_ui.section=section;g_ui.selected=0;g_ui.scroll=0;g_ui.button=0;g_ui.focus=UI_SECTIONS;
-    if(g_ui.page==UI_DLC && section==1) dlc_scan_src();
+    if(g_ui.page==UI_DLC) modern_dlc_request(section,0);
     if(g_ui.page==UI_GRAPHICS && section==2) scan_switch_gfx_files();
     if(g_ui.page==UI_RADIO && section<2) modern_radio_scan(section);
     modern_sync();
@@ -137,24 +142,25 @@ static void modern_build(void) {
         int count=g_ui.section?g_dlc_src_count:g_dlc_count;
         for(int i=0;i<count;i++) {
             DlcItem *it=g_ui.section?&g_dlc_src[i]:&g_dlc_items[i];char sub[192],note[384],size[32];fmt_size(size,sizeof(size),it->rpf_size);
-            const char *badge=!it->has_rpf?TR("缺少 RPF","Missing RPF"):it->fmt==0?TR("PC 格式","PC format"):it->fmt<0?TR("无法读取","Unreadable"):it->map_st==GC_MAP_BAD?TR("地图异常","Map issue"):g_ui.section?TR("待导入","Ready"):it->full?TR("已注册","Registered"):TR("未完整注册","Incomplete");
-            snprintf(sub,sizeof(sub),TR("%s  /  模型 %d  地图 %d  贴图 %d","%s  /  Models %d  Maps %d  Textures %d"),size,it->n_model,it->n_map,it->n_tex);
+            const char *badge=!it->has_rpf?TR("缺少 RPF","Missing RPF"):it->fmt==-2?TR("正在读取","Loading"):it->fmt==0?TR("PC 格式","PC format"):it->fmt<0?TR("无法读取","Unreadable"):it->map_st==GC_MAP_BAD?TR("地图异常","Map issue"):g_ui.section?TR("待导入","Ready"):it->full?TR("已注册","Registered"):TR("未完整注册","Incomplete");
+            if(it->fmt==-2)snprintf(sub,sizeof(sub),TR("%s  /  资源信息按需加载","%s  /  Resource details load on demand"),size);
+            else snprintf(sub,sizeof(sub),TR("%s  /  模型 %d  地图 %d  贴图 %d","%s  /  Models %d  Maps %d  Textures %d"),size,it->n_model,it->n_map,it->n_tex);
             snprintf(note,sizeof(note),TR("目录：%s\n刷车名：%s\n%s","Folder: %s\nSpawn name: %s\n%s"),it->name,it->spawn[0]?it->spawn:"-",
                 it->fmt==0?TR("PC 格式可能导致闪退。请先完成 Switch 格式转换再导入。","PC format may crash the game. Convert it to Switch format before import."):TR("注册会同时更新两处游戏配置。建议每次少量添加，再重启游戏验证。","Registration updates both required game configurations. Add a few packs at a time and restart to verify."));
             modern_row(it->cn[0]?it->cn:it->name,sub,badge,note,g_ui.section?U_DLC_IMPORT:U_DLC_TOGGLE,i,
                 !it->has_rpf||it->fmt!=1||it->map_st==GC_MAP_BAD?UI_WARN:it->full?UI_ACCENT:UI_MUTED,
-                !g_dlc_xml_loaded || (g_ui.section && (!it->has_rpf || it->fmt!=1)));
+                modern_dlc_busy() || !g_dlc_xml_loaded || !it->has_rpf || it->fmt<0 || (g_ui.section && it->fmt!=1));
         }
-        g_view.empty_title=g_ui.section?TR("没有待导入的 DLC","No DLC ready to import"):TR("还没有安装 DLC","No installed DLC");
+        g_view.empty_title=modern_dlc_busy()?TR("正在读取 DLC 目录…","Loading DLC folders…"):g_ui.section?TR("没有待导入的 DLC","No DLC ready to import"):TR("还没有安装 DLC","No installed DLC");
         g_view.empty_body=TR("将包含 dlc.rpf 的文件夹放到下方目录。重新扫描后，在「待导入」中选择要安装的内容。","Place folders containing dlc.rpf in the directory below. Rescan, then choose a pack in Ready to import.");
         g_view.empty_path="sdmc:/switch/gta5save/dlc/";
         modern_button(g_ui.section?TR("导入所选","Import selected"):TR("注册 / 注销","Toggle registration"),UI_RUN_ROW,0,!count || !g_dlc_xml_loaded || g_view.rows[g_ui.selected<g_view.row_count?g_ui.selected:0].disabled,0);
         modern_button(TR("重新扫描","Rescan"),U_DLC_REFRESH,0,0,0);
-        modern_button(TR("检查资源","Inspect"),U_DLC_CHECK,0,!count,0);
+        modern_button(TR("检查资源","Inspect"),U_DLC_CHECK,0,!count || modern_dlc_busy(),0);
         if(!g_ui.section) {
-            modern_button(TR("转换格式","Convert format"),U_DLC_CONVERT,0,!count,0);
-            modern_button(TR("屏蔽高清贴图","Hide HD textures"),U_DLC_HD,0,!count,0);
-            modern_button(TR("删除 DLC","Delete DLC"),U_DLC_DELETE,0,!count || !g_dlc_xml_loaded,1);
+            modern_button(TR("转换格式","Convert format"),U_DLC_CONVERT,0,!count || modern_dlc_busy(),0);
+            modern_button(TR("屏蔽高清贴图","Hide HD textures"),U_DLC_HD,0,!count || modern_dlc_busy(),0);
+            modern_button(TR("删除 DLC","Delete DLC"),U_DLC_DELETE,0,!count || modern_dlc_busy() || !g_dlc_xml_loaded,1);
         } else {modern_button(TR("目录说明","Folders"),U_DLC_INFO,0,0,0);modern_button(TR("安装目录","Installed folder"),UI_GO_SECTION,0,0,0);}
         g_view.status=g_dlc_msg;g_view.status_tone=g_dlc_msg_ok?UI_ACCENT:UI_ERROR;
     } else if(g_ui.page==UI_GRAPHICS) {
@@ -268,7 +274,7 @@ static void modern_execute(UiEvent e,int confirmed) {
             g_ui.page==UI_MODS||g_ui.page==UI_DLC||g_ui.page==UI_ADVANCED?TR("请先保留完整 RPF 备份。完成后重启游戏生效。","Keep a complete RPF backup. Restart the game afterwards."):TR("请检查所选内容与目标。","Check the selection and target before confirming."));
         modern_dialog(1,e.action==U_EXIT?TR("退出工具？","Exit toolbox?"):TR("确认此次修改？","Confirm this change?"),body,e);return;
     }
-    char out[8192]={0};
+    char out[65536]={0};
     switch(e.action) {
     case U_MOD_INSTALL: g_mod_pending_kind=1;g_mod_pending_idx=e.param;script_mgr_apply();break;
     case U_MOD_RESTORE: g_mod_pending_kind=0;g_mod_pending_idx=e.param;script_mgr_apply();break;
@@ -276,16 +282,15 @@ static void modern_execute(UiEvent e,int confirmed) {
     case U_SCRIPT_REMOVE: script_uninstall_selected();break;
     case U_SCRIPT_SCAN: script_scan();dlc_msg(TR("扫描完成：%d 个外部脚本","Scan complete: %d external scripts"),g_script_count);break;
     case U_SCRIPT_INFO: script_show_dir();modern_report(TR("脚本目录与安装状态","Script folder & status"),g_script_dirinfo);break;
-    case U_DLC_REFRESH: dlc_reload();dlc_scan_src();break;
+    case U_DLC_REFRESH: if(g_dlc_dirty)modern_report(TR("请先保存 DLC 修改","Save DLC edits first"),TR("保存未写入修改后再重新扫描。","Save pending edits before rescanning."));else modern_dlc_request(g_ui.section,1);break;
     case U_DLC_TOGGLE: g_dlc_sel=e.param;dlc_toggle_selected();break;
     case U_DLC_IMPORT: g_dlc_src_sel=e.param;dlc_import_selected();break;
     case U_DLC_DELETE: if(dlc_delete_selected()==0) {g_dlc_confirm=0;dlc_do_delete();}break;
     case U_DLC_CONVERT: dlc_convert_selected();break;
     case U_DLC_HD: dlc_hide_hd_selected();break;
-    case U_DLC_CHECK: {
-        int i=g_ui.selected;const char *name=g_ui.section?(i<g_dlc_src_count?g_dlc_src[i].name:NULL):(i<g_dlc_count?g_dlc_items[i].name:NULL);
-        if(name) {int rc=dlc_check_integrity(name,out,sizeof(out));modern_report(rc<0?TR("资源检查失败","Inspection failed"):TR("DLC 资源检查","DLC inspection"),out);}break;
-    }
+    case U_DLC_CHECK:
+        modern_dlc_inspect(g_ui.section,g_ui.selected,out,sizeof(out));
+        modern_report(TR("DLC 车辆与资源检查","DLC vehicles & resources"),out);break;
     case U_DLC_INFO: modern_report(TR("DLC 目录说明","DLC folders"),TR("待导入目录：\nsdmc:/switch/gta5save/dlc/\n每个文件夹需包含 dlc.rpf，导入前须转换为 Switch 格式。\n\n游戏安装目录：\n/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/\n\n已安装的 PC 格式包可用「转换格式」处理。","Import folder:\nsdmc:/switch/gta5save/dlc/\nEach folder needs dlc.rpf in Switch format before import.\n\nInstalled folder:\n/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/\n\nUse Convert format for installed PC-format packs."));break;
     case U_GFX_PRESET: gfx_apply_preset(e.param);break;
     case U_GFX_IMPORT: if(e.param>=0 && e.param<g_gfx_switch_count) gfx_import_from_switch(g_gfx_switch_files[e.param]);break;
@@ -310,8 +315,25 @@ static void modern_execute(UiEvent e,int confirmed) {
     case U_EXIT: g_ui_running=0;break;
     default: break;
     }
+    if(e.action==U_DLC_IMPORT || e.action==U_DLC_DELETE || e.action==U_DLC_CONVERT || e.action==U_DLC_HD) {
+        modern_dlc_request(g_ui.section,1);
+    }
 }
-static void modern_rect(void *ctx,int x,int y,int w,int h,uint32_t col) {gfx_rect(ctx,x,y,w,h,col);}
-static void modern_text(void *ctx,int x,int y,int size,const char *str,uint32_t col) {draw_text(ctx,x,y,size,str,col);}
+/* A short eased fade/offset adds no full-screen copies or extra buffers. */
+static void modern_transition_update(void) {
+    unsigned ms=g_ui_transition_tick?(unsigned)((svcGetSystemTick()-g_ui_transition_tick)*1000/19200000ULL):160;
+    if(ms>=160 || g_ui_dialog) {g_ui_transition_tick=0;g_ui_transition_alpha=255;g_ui_transition_x=0;return;}
+    unsigned remain=160-ms;
+    g_ui_transition_alpha=255-(int)((u64)remain*remain*remain*255/(160*160*160));
+    g_ui_transition_x=(int)(12*remain*remain/(160*160));
+}
+static uint32_t modern_color(int x,uint32_t col) {
+    if(x<228 || g_ui_dialog || g_ui_transition_alpha==255)return col;
+    unsigned a=(unsigned)g_ui_transition_alpha,r=col&255,g=(col>>8)&255,b=(col>>16)&255;
+    return UI_RGB((r*a+15*(255-a))/255,(g*a+21*(255-a))/255,(b*a+28*(255-a))/255);
+}
+static int modern_x(int x) {return x>=228 && !g_ui_dialog?x+g_ui_transition_x:x;}
+static void modern_rect(void *ctx,int x,int y,int w,int h,uint32_t col) {gfx_rect(ctx,modern_x(x),y,w,h,modern_color(x,col));}
+static void modern_text(void *ctx,int x,int y,int size,const char *str,uint32_t col) {draw_text(ctx,modern_x(x),y,size,str,modern_color(x,col));}
 static int modern_measure(void *ctx,const char *str,int size) {(void)ctx;return text_width(str,size);}
-static void modern_hit(void *ctx,int x,int y,int w,int h,UiEvent e) {(void)ctx;hot_add(x,y,w,h,e.action,e.param);}
+static void modern_hit(void *ctx,int x,int y,int w,int h,UiEvent e) {(void)ctx;hot_add(modern_x(x),y,w,h,e.action,e.param);}

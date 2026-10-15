@@ -17,7 +17,7 @@
 #define UI_ERROR UI_RGB(255,147,147)
 
 enum { UI_HOME, UI_MODS, UI_DLC, UI_GRAPHICS, UI_SAVES, UI_RADIO, UI_ADVANCED };
-enum { UI_LIST, UI_SECTIONS, UI_BUTTONS };
+enum { UI_LIST, UI_SECTIONS, UI_BUTTONS, UI_SIDEBAR };
 enum { UI_UP=1, UI_DOWN=2, UI_LEFT=4, UI_RIGHT=8, UI_ACCEPT=16,
        UI_ACTIONS=32, UI_PREV=64, UI_NEXT=128, UI_BACK=256 };
 /* Reserved presentation events. Backend commands use positive values. */
@@ -49,8 +49,14 @@ typedef struct {
     int dialog_scroll;
 } UiView;
 typedef struct {
-    int page, section, selected, scroll, focus, button;
+    int page, section, selected, scroll, focus, button, sidebar;
 } UiState;
+
+typedef struct {
+    int active, id, start_x, start_y, last_y, dragged, area, carry;
+    int page, section, dialog;
+} UiTouch;
+typedef struct { int tap, x, y, report_lines, changed; } UiTouchResult;
 typedef struct {
     void *ctx;
     void (*rect)(void *,int,int,int,int,uint32_t);
@@ -62,6 +68,7 @@ typedef struct {
 void ui_reset(UiState *, int page, int section);
 void ui_clamp(UiState *, const UiView *);
 UiEvent ui_input(UiState *, const UiView *, unsigned keys);
+UiTouchResult ui_touch(UiTouch *, UiState *, const UiView *, int count, int id, int x, int y);
 void ui_render(const UiCanvas *, UiState *, const UiView *);
 int ui_report_max_scroll(const UiCanvas *, const char *);
 

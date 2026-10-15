@@ -9,7 +9,7 @@ from pathlib import Path
 def compile_library(root, output, zlib_source):
     output.mkdir(parents=True, exist_ok=True)
     import shlex
-    sources=[root/'source'/n for n in ['gc_nsc.c','gc_script.c','gc_rpf.c','gc_package.c']]+[root/'tests/support/host.c']
+    sources=[root/'source'/n for n in ['gc_nsc.c','gc_script.c','gc_rpf.c','gc_package.c','gc_vehicle.c']]+[root/'tests/support/host.c']
     paths=output/'host_paths.h'
     paths.write_text('#define GC_PACKAGE_GAME "'+(output/'fixture-game').resolve().as_posix()+'"\n#define GC_PACKAGE_HOME "'+(output/'fixture-packages').resolve().as_posix()+'"\n'+
                      '#define GC_PACKAGE_RENAME gc_host_rename\nint gc_host_rename(const char *,const char *);\n')
@@ -20,7 +20,7 @@ def compile_library(root, output, zlib_source):
         if zlib_source is None:raise RuntimeError('Windows tests require --zlib-source')
         sources += [zlib_source/n for n in ['adler32.c','crc32.c','compress.c','deflate.c','inflate.c','inffast.c','inftrees.c','trees.c','zutil.c']]
         args += ['-I'+str(zlib_source)]
-        exports=['gc_nsc_validate','gc_nsc_decode_validate','gc_script_install','gc_script_uninstall','gc_host_set_archive','gc_package_read','gc_package_install','gc_package_restore','gc_package_state','gc_package_recover','gc_host_fail_rename']
+        exports=['gc_nsc_validate','gc_nsc_decode_validate','gc_script_install','gc_script_uninstall','gc_host_set_archive','gc_package_read','gc_package_install','gc_package_restore','gc_package_state','gc_package_recover','gc_host_fail_rename','gc_vehicle_inspect']
         definitions=output/'exports.def'
         definitions.write_text('EXPORTS\n'+'\n'.join(exports)+'\n')
         args += [str(definitions.resolve())]

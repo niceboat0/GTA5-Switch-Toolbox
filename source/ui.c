@@ -118,7 +118,7 @@ static void icon(const UiCanvas *c,int x,int y,int type,uint32_t col) {
     }
 }
 void ui_reset(UiState *s,int page,int section) {
-    memset(s,0,sizeof(*s)); s->page=page; s->section=section;
+    memset(s,0,sizeof(*s)); s->page=page; s->section=section;s->sidebar=page;
 }
 void ui_clamp(UiState *s,const UiView *v) {
     if (s->selected>=v->row_count) s->selected=v->row_count>0?v->row_count-1:0;
@@ -144,6 +144,7 @@ static int next_button(const UiView *v,int start,int dir) {
     }
     return 0;
 }
+static void sidebar_focus(UiState *s) {s->focus=UI_SIDEBAR;s->sidebar=s->page;}
 UiEvent ui_input(UiState *s,const UiView *v,unsigned keys) {
     ui_clamp(s,v);
     if(v->dialog) {
@@ -151,15 +152,25 @@ UiEvent ui_input(UiState *s,const UiView *v,unsigned keys) {
         if(keys&UI_ACCEPT) return event(v->dialog==1?UI_DIALOG_OK:UI_DIALOG_CANCEL,0);
         return event(0,0);
     }
-    if(keys&UI_BACK) return event(UI_GO_PAGE,UI_HOME);
+    if(keys&UI_BACK) {
+        if(s->focus==UI_SIDEBAR) return event(UI_GO_PAGE,UI_HOME);
+        sidebar_focus(s);return event(0,0);
+    }
     if(keys&UI_PREV) return event(UI_GO_PAGE,(s->page+UI_PAGE_COUNT-1)%UI_PAGE_COUNT);
     if(keys&UI_NEXT) return event(UI_GO_PAGE,(s->page+1)%UI_PAGE_COUNT);
+    if(s->focus==UI_SIDEBAR) {
+        if(keys&UI_UP) s->sidebar=(s->sidebar+UI_PAGE_COUNT-1)%UI_PAGE_COUNT;
+        else if(keys&UI_DOWN) s->sidebar=(s->sidebar+1)%UI_PAGE_COUNT;
+        if(keys&(UI_RIGHT|UI_ACCEPT)) return event(UI_GO_PAGE,s->sidebar);
+        return event(0,0);
+    }
     if(keys&UI_ACTIONS) {
         s->focus=s->focus==UI_BUTTONS?(v->row_count?UI_LIST:UI_SECTIONS):UI_BUTTONS;
         if(v->button_count && v->buttons[s->button].disabled) s->button=next_button(v,s->button,1);
         return event(0,0);
     }
     if(s->page==UI_HOME) {
+        if((keys&UI_LEFT) && !(s->selected&1)) {sidebar_focus(s);return event(0,0);}
         if(keys&UI_LEFT) s->selected&=~1;
         if(keys&UI_RIGHT) s->selected|=1;
         if(keys&UI_UP) s->selected=s->selected>=2?s->selected-2:s->selected;
@@ -168,20 +179,59 @@ UiEvent ui_input(UiState *s,const UiView *v,unsigned keys) {
         return event(0,0);
     }
     if(s->focus==UI_SECTIONS) {
+        if((keys&UI_LEFT) && s->section==0) {sidebar_focus(s);return event(0,0);}
         int dir=(keys&UI_LEFT)?-1:(keys&UI_RIGHT)?1:0;
         if(dir && v->section_count>1) return event(UI_GO_SECTION,(s->section+dir+v->section_count)%v->section_count);
         if(keys&(UI_DOWN|UI_ACCEPT)) s->focus=v->row_count?UI_LIST:UI_BUTTONS;
     } else if(s->focus==UI_BUTTONS) {
+        if(keys&UI_LEFT) {
+            int previous=0;for(int i=0;i<s->button;i++) if(!v->buttons[i].disabled) previous=1;
+            if(!previous) {sidebar_focus(s);return event(0,0);}
+        }
         if(keys&UI_LEFT) s->button=next_button(v,s->button,-1);
         if(keys&UI_RIGHT) s->button=next_button(v,s->button,1);
         if(keys&UI_UP) s->focus=v->row_count?UI_LIST:UI_SECTIONS;
         if(keys&UI_ACCEPT && v->button_count && !v->buttons[s->button].disabled) return v->buttons[s->button].event;
     } else {
+        if(keys&UI_LEFT) {sidebar_focus(s);return event(0,0);}
         if(keys&UI_UP) { if(s->selected>0) s->selected--; else if(v->section_count>1) s->focus=UI_SECTIONS; }
         if(keys&UI_DOWN) { if(s->selected+1<v->row_count) s->selected++; else if(v->button_count) s->focus=UI_BUTTONS; }
         if(keys&UI_ACCEPT && v->row_count && !v->rows[s->selected].disabled) return v->rows[s->selected].event;
     }
     ui_clamp(s,v); return event(0,0);
+}
+
+/* One tap on release. A drag, long hold or extra finger never repeats actions. */
+UiTouchResult ui_touch(UiTouch *t,UiState *s,const UiView *v,int count,int id,int x,int y) {
+    UiTouchResult r={0};
+    if(count==0) {
+        if(t->active==1 && !t->dragged && t->page==v->page && t->section==v->section && t->dialog==v->dialog) {r.tap=1;r.x=t->start_x;r.y=t->start_y;}
+        memset(t,0,sizeof(*t));return r;
+    }
+    if(count!=1 || t->active==-1) {t->active=-1;return r;}
+    if(!t->active) {
+        t->active=1;t->id=id;t->start_x=x;t->start_y=y;t->last_y=y;
+        t->page=v->page;t->section=v->section;t->dialog=v->dialog;
+        if(v->dialog==2 && x>=329 && x<1171 && y>=243 && y<520) t->area=2;
+        else if(!v->dialog && v->page!=UI_HOME && x>=264 && x<915 && y>=234 && y<538) t->area=1;
+        return r;
+    }
+    if(id!=t->id || t->page!=v->page || t->section!=v->section || t->dialog!=v->dialog) {t->active=-1;return r;}
+    int dx=x-t->start_x,dy=y-t->start_y;
+    if(dx>12 || dx<-12 || dy>12 || dy<-12) t->dragged=1;
+    if(t->dragged && t->area && (dy>12 || dy<-12 || t->carry)) {
+        t->carry+=t->last_y-y;
+        int step=t->area==2?26:52,lines=t->carry/step;t->carry-=lines*step;
+        if(t->area==2) {r.report_lines=lines;r.changed=lines!=0;}
+        else if(lines && v->row_count>4) {
+            int old=s->scroll,next=old+lines,max=v->row_count-4;
+            if(next<0) next=0;
+            if(next>max) next=max;
+            s->scroll=next;s->selected+=next-old;s->focus=UI_LIST;
+            ui_clamp(s,v);r.changed=old!=next;
+        }
+    }
+    t->last_y=y;return r;
 }
 
 void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
@@ -195,13 +245,15 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
     for(int i=0;i<UI_PAGE_COUNT;i++) {
         int y=149+i*62+(i==UI_ADVANCED?26:0),active=i==s->page;
         if(i==UI_ADVANCED) rect(c,28,y-18,172,1,LINE);
-        if(active) roundrect(c,16,y,196,49,10,SELECTED);
+        int focused=s->focus==UI_SIDEBAR && s->sidebar==i;
+        if(focused) roundrect(c,14,y-2,200,53,12,UI_ACCENT);
+        if(active || focused) roundrect(c,16,y,196,49,10,SELECTED);
         icon(c,32,y+13,i,active?UI_ACCENT:UI_MUTED);
         fit(c,68,y+14,v->en?15:17,138,v->en?en[i]:zh[i],active?UI_ACCENT:UI_MUTED);
         hit(c,16,y,196,49,UI_GO_PAGE,i);
     }
     text(c,30,617,13,"GTA5 SWITCH TOOLBOX",UI_MUTED);
-    text(c,30,642,12,"v7.1.0",UI_MUTED);
+    text(c,30,642,12,"v7.2.0",UI_MUTED);
     text(c,30,680,12,T(v,"L / R  切换页面","L / R  Switch page"),UI_MUTED);
 
     if(s->page==UI_HOME) {
@@ -213,7 +265,7 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
         text(c,286,215,14,T(v,"写入 RPF 前，请先备份 update.rpf 与 update2.rpf。","Back up update.rpf and update2.rpf before editing archives."),UI_MUTED);
         for(int i=0;i<v->row_count && i<4;i++) {
             int x=264+(i%2)*502,y=269+(i/2)*149,sel=i==s->selected;
-            if(sel) roundrect(c,x-2,y-2,482,135,16,UI_ACCENT);
+            if(sel && s->focus==UI_LIST) roundrect(c,x-2,y-2,482,135,16,UI_ACCENT);
             roundrect(c,x,y,478,131,14,sel?SELECTED:UI_SURFACE);
             icon(c,x+24,y+24,i+1,UI_ACCENT);
             fit(c,x+65,y+22,24,380,v->rows[i].title,UI_TEXT);
@@ -284,7 +336,7 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
     }
     rect(c,264,665,980,1,LINE);
     fit(c,264,637,14,980,v->status,v->status_tone?v->status_tone:UI_MUTED);
-    text(c,264,682,14,T(v,"方向键  选择    A  确认    B  返回总览    X  操作栏    +  退出","D-pad  Select    A  Confirm    B  Overview    X  Actions    +  Exit"),UI_MUTED);
+    text(c,264,682,14,T(v,"左 / B  侧栏    上下  选择    右 / A  打开    X  操作栏    触屏滑动列表","Left / B  Sidebar    Up / Down  Select    Right / A  Open    X  Actions    Swipe lists"),UI_MUTED);
     if(v->dialog) {
         /* A solid scrim also prevents visually reading the background as active. */
         rect(c,228,0,1052,720,UI_BG);

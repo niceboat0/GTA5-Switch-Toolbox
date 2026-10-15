@@ -57,11 +57,43 @@ int main(void) {
     e=ui_input(&s,&view,UI_NEXT);assert(e.action==UI_GO_PAGE && e.param==UI_ADVANCED);
     fixture(UI_MODS,5);ui_reset(&s,UI_MODS,0);s.selected=999;s.scroll=999;ui_clamp(&s,&view);assert(s.selected==4 && s.scroll==1);
     view.row_count=0;ui_clamp(&s,&view);assert(s.selected==0 && s.scroll==0);
+    fixture(UI_DLC,40);ui_reset(&s,UI_DLC,0);s.selected=7;s.scroll=4;
+    e=ui_input(&s,&view,UI_LEFT);assert(e.action==0 && s.focus==UI_SIDEBAR && s.sidebar==UI_DLC);
+    ui_input(&s,&view,UI_DOWN);assert(s.sidebar==UI_GRAPHICS && s.selected==7 && s.scroll==4);
+    e=ui_input(&s,&view,UI_RIGHT);assert(e.action==UI_GO_PAGE && e.param==UI_GRAPHICS);
+    s.sidebar=0;ui_input(&s,&view,UI_UP);assert(s.sidebar==UI_ADVANCED);
+    e=ui_input(&s,&view,UI_ACCEPT);assert(e.action==UI_GO_PAGE && e.param==UI_ADVANCED);
+    s.focus=UI_SECTIONS;s.section=0;ui_input(&s,&view,UI_LEFT);assert(s.focus==UI_SIDEBAR);
+    s.focus=UI_BUTTONS;s.button=0;ui_input(&s,&view,UI_LEFT);assert(s.focus==UI_SIDEBAR);
+    s.focus=UI_LIST;ui_input(&s,&view,UI_BACK);assert(s.focus==UI_SIDEBAR);
+    view.dialog=1;e=ui_input(&s,&view,UI_DOWN|UI_RIGHT);assert(!e.action && s.sidebar==UI_DLC);view.dialog=0;
+    UiTouch t={0};UiTouchResult tr;
+    s.focus=UI_LIST;s.scroll=0;s.selected=0;
+    tr=ui_touch(&t,&s,&view,1,1,400,420);assert(!tr.tap);
+    for(int i=0;i<60;i++) {tr=ui_touch(&t,&s,&view,1,1,400,420);assert(!tr.tap && !tr.changed);}
+    tr=ui_touch(&t,&s,&view,1,1,400,260);assert(tr.changed && s.scroll==3 && s.selected==3);
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(!tr.tap);
+    ui_touch(&t,&s,&view,1,1,400,260);tr=ui_touch(&t,&s,&view,1,1,400,520);assert(s.scroll==0);
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(!tr.tap);
+    ui_touch(&t,&s,&view,1,1,400,300);ui_touch(&t,&s,&view,1,1,408,304);
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(tr.tap && tr.x==400 && tr.y==300);
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(!tr.tap);
+    ui_touch(&t,&s,&view,1,1,400,300);ui_touch(&t,&s,&view,2,1,400,300);
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(!tr.tap);
+    ui_touch(&t,&s,&view,1,1,400,300);ui_touch(&t,&s,&view,1,2,400,300);
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(!tr.tap);
+    ui_touch(&t,&s,&view,1,1,400,300);view.dialog=1;
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(!tr.tap);view.dialog=2;
+    ui_touch(&t,&s,&view,1,1,400,440);tr=ui_touch(&t,&s,&view,1,1,400,310);assert(tr.report_lines==5);
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(!tr.tap);view.dialog=1;
+    ui_touch(&t,&s,&view,1,1,800,550);ui_touch(&t,&s,&view,1,1,800,350);
+    tr=ui_touch(&t,&s,&view,0,0,0,0);assert(!tr.tap);view.dialog=0;
     UiCanvas c={NULL,rect,text,measure,hit};
     assert(ui_report_max_scroll(&c,"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11")==2);
     assert(ui_report_max_scroll(&c,"Short report")==0);
     for(int page=0;page<UI_PAGE_COUNT;page++) for(int lang=0;lang<2;lang++) {
         fixture(page,page==UI_HOME?4:9);view.en=lang;ui_reset(&s,page,0);ui_render(&c,&s,&view);
+        s.focus=UI_SIDEBAR;s.sidebar=(page+1)%UI_PAGE_COUNT;ui_render(&c,&s,&view);
         if(page) {view.row_count=0;ui_render(&c,&s,&view);}
     }
     fixture(UI_MODS,4);ui_reset(&s,UI_MODS,0);view.dialog=1;view.dialog_title="Confirm";view.dialog_body="A specific change to a specific target.";

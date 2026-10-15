@@ -23,7 +23,7 @@ class View(c.Structure):
         ('empty_title',c.c_char_p),('empty_body',c.c_char_p),('empty_path',c.c_char_p),('status',c.c_char_p),('status_tone',c.c_uint32),
         ('rows',Row*256),('buttons',Button*6),('dialog',c.c_int),('dialog_title',c.c_char_p),('dialog_body',c.c_char_p),('dialog_confirm',c.c_char_p),('dialog_scroll',c.c_int)]
 class State(c.Structure):
-    _fields_=[(x,c.c_int) for x in ['page','section','selected','scroll','focus','button']]
+    _fields_=[(x,c.c_int) for x in ['page','section','selected','scroll','focus','button','sidebar']]
 Rect=c.CFUNCTYPE(None,c.c_void_p,c.c_int,c.c_int,c.c_int,c.c_int,c.c_uint32)
 Text=c.CFUNCTYPE(None,c.c_void_p,c.c_int,c.c_int,c.c_int,c.c_char_p,c.c_uint32)
 Measure=c.CFUNCTYPE(c.c_int,c.c_void_p,c.c_char_p,c.c_int)

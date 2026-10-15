@@ -17,6 +17,7 @@
 #include "save_backup.h"
 #include "gc_rpf.h"
 #include "gc_dlc.h"
+#include "gc_vehicle.h"
 #include "gc_script.h"   /* ★ v5.0: 脚本 mod（.nsc）安装 */
 #include "gc_presets.h"
 #include "ui.h"
@@ -106,10 +107,6 @@ static int     g_hot_count = 0;
 
 /* 触屏状态 */
 static HidTouchScreenState g_touch;
-static int g_touch_x = -1, g_touch_y = -1;   /* 当前触摸点 (-1=无) */
-static int g_touch_tapped = 0;               /* 本帧是否有「新触摸」 */
-static u64 g_touch_last_tick = 0;            /* 上次触摸时间(防连击) */
-
 static void hot_reset(void) { g_hot_count = 0; }
 
 static void hot_add(int x, int y, int w, int h, int action, int param) {
@@ -129,26 +126,9 @@ static int hot_hit(int px, int py) {
     return -1;
 }
 
-/* 每帧开头读取触摸屏, 更新 g_touch_x/y 与 g_touch_tapped */
+/* Gestures are handled by the platform-independent UI after HID sampling. */
 static void touch_poll(void) {
-    g_touch_tapped = 0;
-    g_touch_x = -1;
-    g_touch_y = -1;
-    if (hidGetTouchScreenStates(&g_touch, 1) <= 0 || g_touch.count <= 0) {
-        g_touch_last_tick = 0;
-        return;
-    }
-    /* 只取第一个触点 (Switch 电容屏最多 16 点, 单指足够) */
-    g_touch_x = (int)g_touch.touches[0].x;
-    g_touch_y = (int)g_touch.touches[0].y;
-
-    /* 防连击: 距离上次触发 >= 180ms 才算「新点击」 */
-    u64 now = svcGetSystemTick();
-    u64 ms = (now - g_touch_last_tick) * 1000 / 19200000ULL;
-    if (g_touch_last_tick == 0 || ms >= 180) {
-        g_touch_tapped = 1;
-        g_touch_last_tick = now;
-    }
+    memset(&g_touch,0,sizeof(g_touch));hidGetTouchScreenStates(&g_touch,1);
 }
 
 /* 摇杆方向 -> 方向键位（超出阈值即模拟方向键）
@@ -2092,6 +2072,7 @@ typedef struct {
     int  n_model, n_map, n_tex;/* ★ v32: 资源构成（模型 / 地图数据 / 贴图） */
     char cn[64];               /* ★ v5.1: 中文显示名（读包目录下 name.txt，UTF-8 一行） */
     char spawn[48];            /* ★ v5.2: 车辆刷车名（车辆包才有） */
+    char source_path[768]; /* Cached discovery path, avoiding repeated root searches. */
 } DlcItem;
 
 static DlcItem g_dlc_items[DLC_MAX];
@@ -2562,6 +2543,7 @@ static int dlc_scan_dlcpacks(void) {
         it->rpf_size = (sz > 0) ? (u32)sz : 0;
         /* ★ v5.1: 中文显示名（可选） */
         dlc_read_cn_name(sub, it->cn, sizeof(it->cn));
+        snprintf(it->source_path,sizeof(it->source_path),"%s",sub);
         /* ★ v33: 一次 IO 拿全部信息（格式 + 地图自检 + 资源构成）
          *   🚨 勿改回分别调用三个函数 -- 那会把同一份数据重复读 ~10 次，列表一多就卡 */
         if (it->has_rpf) {
@@ -3122,19 +3104,21 @@ static int dlc_scan_src(void) {
             strncpy(it->name, ent->d_name, DLC_NAME_MAX - 1);
             it->has_rpf  = 1;
             it->rpf_size = (u32)sz;
+            snprintf(it->source_path,sizeof(it->source_path),"%s",sub);
             /* ★ v5.1: 中文显示名（同一约定） */
             {
                 char sdir[768];
-                if (dlc_src_path_of(it->name, sdir, sizeof(sdir)) == 0)
+                if (snprintf(sdir,sizeof(sdir),"%s",sub)>0)
                     dlc_read_cn_name(sdir, it->cn, sizeof(it->cn));
             }
             /* ★ v33: 资源构成（用统一 probe，一次 IO；PC/Switch 都能统计） */
             {
                 char srp[700], rp2[760];
-                if (dlc_src_path_of(it->name, srp, sizeof(srp)) == 0) {
+                if (snprintf(srp,sizeof(srp),"%s",sub)>0) {
                     snprintf(rp2, sizeof(rp2), "%s/dlc.rpf", srp);
                     GcDlcProbe pb;
                     gc_dlc_probe(rp2, &pb);
+                    it->fmt = pb.fmt;it->map_st = pb.map_st;
                     it->n_model = pb.n_model;
                     it->n_map   = pb.n_map;
                     it->n_tex   = pb.n_tex;
@@ -3534,158 +3518,15 @@ static int dlc_do_delete(void) {
  *
  * blob  = 完整 rpf 数据（含 16 B header）
  * 返回  1 = 有资源且配对齐全；0 = 无车辆资源；-1 = 缺 _hi */
-static int dlc_count_vehicles(const u8 *blob, size_t blen,
-                              int *out_model, int *out_hi, int depth) {
-    if (depth > 4 || blen < 16) return 0;
-    u32 magic = (u32)blob[0] | ((u32)blob[1] << 8) |
-                ((u32)blob[2] << 16) | ((u32)blob[3] << 24);
-    if (magic != 0x52504637u) return 0;      /* 不是 RPF7 */
-
-    u32 ec   = (u32)blob[4] | ((u32)blob[5] << 8) |
-               ((u32)blob[6] << 16) | ((u32)blob[7] << 24);
-    u32 nl   = (u32)blob[8] | ((u32)blob[9] << 8) |
-               ((u32)blob[10] << 16) | ((u32)blob[11] << 24);
-    u32 nlen = nl & 0x0FFFFFFFu;
-    u32 sh   = nl >> 28;
-    if (ec == 0 || ec > 200000) return 0;
-
-    size_t toc_off = 16;
-    size_t names_off = toc_off + (size_t)ec * 16;
-    if (names_off + nlen > blen) return 0;
-
-    int model = 0, hi = 0, nested = 0;
-
-    for (u32 i = 0; i < ec; i++) {
-        const u8 *p = blob + toc_off + (size_t)i * 16;
-        u64 q0 = (u64)p[0] | ((u64)p[1] << 8) | ((u64)p[2] << 16) | ((u64)p[3] << 24)
-               | ((u64)p[4] << 32) | ((u64)p[5] << 40) | ((u64)p[6] << 48)
-               | ((u64)p[7] << 56);
-        u32 name_off = (u32)(q0 & 0xFFFF);
-        u32 od       = (u32)((q0 >> 16) & 0xFFFFFF);
-        u32 off      = (u32)((q0 >> 40) & 0x7FFFFF);
-        int is_res   = (int)((q0 >> 63) & 1);
-        u32 d8       = (u32)p[8] | ((u32)p[9] << 8) | ((u32)p[10] << 16) | ((u32)p[11] << 24);
-        if (is_res == 0 && off == 0x7FFFFF) continue;      /* 目录 */
-
-        /* 名字（按 NUL 严格切分） */
-        u32 no = name_off << sh;
-        if (no >= nlen) continue;
-        const char *nm = (const char *)(blob + names_off + no);
-        size_t maxn = nlen - no;
-        size_t ln = 0;
-        while (ln < maxn && ln < 127 && nm[ln]) ln++;
-        if (ln == 0) continue;
-
-        /* 车辆模型：xxx.nft / xxx.yft */
-        if (ln > 4) {
-            char tail[5];
-            memcpy(tail, nm + ln - 4, 4); tail[4] = 0;
-            if (strcasecmp(tail, ".nft") == 0 || strcasecmp(tail, ".yft") == 0) {
-                int is_hi = 0;
-                if (ln > 7) {
-                    char t7[8];
-                    memcpy(t7, nm + ln - 7, 7); t7[7] = 0;
-                    if (strcasecmp(t7, "_hi.nft") == 0 ||
-                        strcasecmp(t7, "_hi.yft") == 0) is_hi = 1;
-                }
-                if (is_hi) hi++; else model++;
-                continue;
-            }
-        }
-
-        /* 内嵌 rpf：递归下钻（通常是未压缩存储 od==0） */
-        if (!is_res && ln > 4) {
-            char tail[5];
-            memcpy(tail, nm + ln - 4, 4); tail[4] = 0;
-            if (strcasecmp(tail, ".rpf") == 0) {
-                u32 nbytes = od ? od : d8;
-                size_t st = (size_t)off * 512;
-                if (nbytes > 0 && st + nbytes <= blen) {
-                    const u8 *sub = blob + st;
-                    if (od != 0 && od != d8) {
-                        /* 压缩的内嵌 rpf：解压到临时缓冲再递归 */
-                        u8 *tmp = (u8*)malloc(d8);
-                        if (tmp) {
-                            z_stream zs; memset(&zs, 0, sizeof(zs));
-                            int ok = 0;
-                            for (int wb = -15; wb <= 15 && !ok; wb += 30) {
-                                memset(&zs, 0, sizeof(zs));
-                                if (inflateInit2(&zs, wb) != Z_OK) continue;
-                                zs.next_in = (Bytef*)sub;  zs.avail_in  = nbytes;
-                                zs.next_out = tmp;         zs.avail_out = d8;
-                                int r = inflate(&zs, Z_FINISH);
-                                if ((r == Z_STREAM_END || r == Z_OK) && zs.total_out > 0)
-                                    ok = (int)zs.total_out;
-                                inflateEnd(&zs);
-                            }
-                            if (ok > 0) {
-                                nested += dlc_count_vehicles(tmp, (size_t)ok,
-                                                             &model, &hi, depth + 1);
-                            }
-                            free(tmp);
-                        }
-                    } else {
-                        nested += dlc_count_vehicles(sub, nbytes, &model, &hi, depth + 1);
-                    }
-                }
-            }
-        }
+static int dlc_check_integrity(const char *name,char *out,size_t cap) {
+    char path[800],err[256]={0};snprintf(path,sizeof(path),"%s/%s/dlc.rpf",DLC_DLCPACKS,name);
+    GcVehicleReport *r=malloc(sizeof(*r));
+    if(!r || gc_vehicle_inspect(path,r,NULL,NULL,err,sizeof(err))) {
+        snprintf(out,cap,TR("无法检查车辆：%s","Vehicle inspection failed: %s"),err[0]?err:TR("内存不足","Out of memory"));free(r);return -1;
     }
-    if (out_model) *out_model = model;
-    if (out_hi)    *out_hi    = hi;
-    return (model + hi + nested) > 0 ? 1 : 0;
-}
-
-/* ★ 完整性检查：看 dlc.rpf（含内嵌 rpf）里每个车辆资源是否齐全
- *   规则：每个 xxx.nft 必须有对应的 xxx_hi.nft
- *   （★ 官方 212 辆车 100% 都有 _hi，缺了会在撞击/近距离时闪退） */
-static int dlc_check_integrity(const char *name, char *out, size_t out_sz) {
-    char p[400];
-    snprintf(p, sizeof(p), "%s/%s/dlc.rpf", DLC_DLCPACKS, name);
-
-    /* 直接用 fopen 读整个 dlc.rpf（十几 MB，一次读进内存最省事） */
-    FILE *f = fopen(p, "rb");
-    if (!f) {
-        snprintf(out, out_sz, TR("打不开 dlc.rpf（路径或文件缺失）", "cannot open dlc.rpf (bad path or missing)"));
-        return -1;
-    }
-    fseeko(f, 0, SEEK_END);
-    off_t fsz = ftello(f);
-    fseeko(f, 0, SEEK_SET);
-    if (fsz <= 0 || fsz > 256 * 1024 * 1024) {
-        fclose(f);
-        snprintf(out, out_sz, TR("dlc.rpf 大小异常 (%ld B)", "dlc.rpf size abnormal (%ld B)"), (long)fsz);
-        return -1;
-    }
-    u8 *blob = (u8*)malloc((size_t)fsz);
-    if (!blob) { fclose(f); snprintf(out, out_sz, TR("内存不足", "Out of memory")); return -1; }
-    size_t got = fread(blob, 1, (size_t)fsz, f);
-    fclose(f);
-    if (got != (size_t)fsz) {
-        free(blob);
-        snprintf(out, out_sz, TR("读取不完整 (%zu/%ld B)", "incomplete read (%zu/%ld B)"), got, (long)fsz);
-        return -1;
-    }
-
-    int model = 0, hi = 0;
-    int has = dlc_count_vehicles(blob, got, &model, &hi, 0);
-    free(blob);
-
-    if (!has || (model + hi) == 0) {
-        snprintf(out, out_sz, TR("该 DLC 里没有车辆资源（可能是地图/音频/武器包，正常）",
-           "no vehicle resources in this DLC (map/audio/weapon pack? normal)"));
-        return 0;
-    }
-    if (model != hi) {
-        int d = model - hi; if (d < 0) d = -d;
-        snprintf(out, out_sz,
-                 TR("注意 缺 _hi 高模！模型 %d / 高模 %d（差 %d）-- 撞击时会闪退",
-           "note: missing _hi models! models %d / hi %d (gap %d) -- crashes on impact"),
-                 model, hi, d);
-        return -1;
-    }
-    snprintf(out, out_sz, TR("[v] 车辆资源齐全（%d 辆车，模型/高模配对）", "[v] vehicle resources complete (%d cars, model/hi paired)"), model);
-    return 0;
+    int missing=0;for(int i=0;i<r->count;i++)if(r->vehicles[i].flags!=3)missing++;
+    snprintf(out,cap,TR("识别 %d 个车辆/刷车名；%d 项模型配对异常%s。完整名称见「检查资源」。","Found %d vehicle/spawn names; %d pairing issues%s. Open Inspect for the full list."),r->count,missing,r->partial?TR("，部分归档未检查","; some archives uninspected"):"");
+    int rc=missing || r->partial?-1:0;free(r);return rc;
 }
 
 /* ========================================================================= */
@@ -4239,13 +4080,20 @@ int main(int argc, char **argv) {
         if(down&HidNpadButton_L) keys|=UI_PREV;
         if(down&HidNpadButton_R) keys|=UI_NEXT;
         touch_poll();
-        int touched=0;
-        if(g_touch_tapped && g_touch_x>=0) {
-            int hi=hot_hit(g_touch_x,g_touch_y);
-            if(hi>=0) {
-                UiEvent e={g_hot[hi].action,g_hot[hi].param};
-                modern_execute(e,0); touched=1;
-            }
+        int touched=g_touch.count>0 || g_ui_touch.active;
+        UiTouchResult gesture=ui_touch(&g_ui_touch,&g_ui,&g_view,(int)g_touch.count,
+            g_touch.count?(int)g_touch.touches[0].finger_id:-1,
+            g_touch.count?(int)g_touch.touches[0].x:0,g_touch.count?(int)g_touch.touches[0].y:0);
+        int touch_changed=gesture.changed;
+        if(keys && g_touch.count) {g_ui_touch.active=-1;gesture.tap=0;}
+        if(gesture.report_lines && g_ui_dialog==2) {
+            g_ui_report_scroll+=gesture.report_lines;
+            if(g_ui_report_scroll<0)g_ui_report_scroll=0;
+            if(g_ui_report_scroll>g_ui_report_max)g_ui_report_scroll=g_ui_report_max;
+        }
+        if(gesture.tap) {
+            int hi=hot_hit(gesture.x,gesture.y);
+            if(hi>=0) {UiEvent e={g_hot[hi].action,g_hot[hi].param};modern_execute(e,0);touch_changed=1;}
         }
         if(!touched) {
             if(g_ui_dialog==2) {
@@ -4263,21 +4111,24 @@ int main(int argc, char **argv) {
         if(dir!=adjust_dir) {adjust=dir;adjust_ticks=0;}
         else if(dir && ++adjust_ticks>=20 && adjust_ticks%5==0) adjust=dir;
         adjust_dir=dir;
-        if(adjust && !g_ui_dialog && !g_view.dialog && g_ui.focus==UI_LIST) {
+        if(adjust && !touched && !g_ui_dialog && !g_view.dialog && g_ui.focus==UI_LIST) {
             if(g_ui.page==UI_GRAPHICS && g_ui.section==1) modern_execute(modern_event(U_GFX_STEP,adjust),0);
             else if(g_ui.page==UI_ADVANCED && g_ui.section==0) modern_execute(modern_event(U_PERF_STEP,adjust),0);
         }
         if(!g_ui_running) break;
-        if(keys || touched || adjust || down) modern_build();
+        if(keys || touch_changed || adjust || down) modern_build();
         u32 stride=0;
         uint32_t *pixels=framebufferBegin(&fb,&stride);
         if(!pixels) continue;
         g_stride_words=stride/sizeof(uint32_t);
         hot_reset();
+        modern_transition_update();
         UiCanvas canvas={pixels,modern_rect,modern_text,modern_measure,modern_hit};
         ui_render(&canvas,&g_ui,&g_view);
         framebufferEnd(&fb);
+        if(!g_touch.count && modern_dlc_tick()) modern_build();
     }
+    modern_dlc_invalidate();
     framebufferClose(&fb);
     if(g_gc_opened) gc_rpf_close(&g_gc_rpf);
     free(g_gc_xml);free(g_dlc_xml);free(g_dlc_etud);

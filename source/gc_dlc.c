@@ -1291,9 +1291,9 @@ void gc_dlc_probe(const char *path, GcDlcProbe *out) {
     /* ---- 收集 .rpf 条目（名字直接从池里取，不再逐条 fseeko）---- */
     static struct { long long off; int is_main; int is_veh; } ents[24];
     int ne = 0;
+    if(fseeko(f,16,SEEK_SET)!=0) {free(pool);fclose(f);return;}
     for (u32 i = 0; i < h.ec && ne < 24; i++) {
         u8 e[16];
-        if (fseeko(f, 16 + (long long)i * 16, SEEK_SET) != 0) break;
         if (fread(e, 1, 16, f) != 16) break;
         u64 q0 = rd_u64(e);
         int is_res = (int)((q0 >> 63) & 1);

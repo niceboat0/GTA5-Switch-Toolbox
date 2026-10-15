@@ -110,3 +110,9 @@ from hbmenu.
 MEGATARD v1.0.5 supports Chinese through its menu language setting. Classic ragemenu (original English) by **maritoguionyo** is also bundled from the user-supplied file. Installing either classic version replaces the shared menu/loader and restores stock shop_controller, removing the corresponding MEGATARD replacement.
 
 The new Radio workspace installs verified Self Radio packages or paired Radio Editor outputs, with backups, restore and interruption recovery. **The Self Radio runtime is not bundled**: the author's v1.1 download folder was empty when checked. Obtain its matching HARD runtime and release-verification.json separately; use tools/export_package.py to prepare it. See docs/RADIO.zh.md for paths and commands. This build requires console testing.
+
+## v7.2 navigation and DLC loading
+
+Swipe lists and detailed reports. Taps activate once on release; dragging or adding a second finger cancels the tap. Press Left or B to focus the sidebar, Up/Down to choose a page, and Right or A to open it. B from the sidebar returns to Overview. Both sticks and the D-pad work; L/R shortcuts remain available. Page changes use a short 160 ms fade and offset while input remains active.
+
+DLC folders load in bounded batches, with cached reentry and visible-item resource probes. Rescan after changing files externally. Inspect lists vehicle model/spawn names and checks each base/_hi pair for installed or import-source packs. It reads directory data and necessary nested containers instead of loading whole DLC archives. Partial inspection is explicitly reported; names and pairing do not prove in-game compatibility.

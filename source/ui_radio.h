@@ -69,6 +69,7 @@ static void modern_radio_progress(unsigned long long done,unsigned long long tot
 }
 /* Package commits rename archives. Invalidate every shared archive/XML cache. */
 static void modern_radio_close_archives(void) {
+    modern_dlc_invalidate();
     if(g_gc_opened) {gc_rpf_close(&g_gc_rpf);g_gc_opened=0;}
     free(g_gc_xml);g_gc_xml=NULL;g_gc_xml_len=0;gc_clear_edited();
     free(g_dlc_xml);g_dlc_xml=NULL;g_dlc_xml_len=0;g_dlc_xml_loaded=0;
