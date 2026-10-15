@@ -42,6 +42,7 @@ static void dlc_prog_end(void) {}
 static void finish(void) {int limit=100;while(modern_dlc_busy() && limit--)modern_dlc_tick();assert(limit>0);}
 int main(int argc,char **argv) {
     assert(argc==3);snprintf(installed_root,sizeof(installed_root),"%s",argv[1]);snprintf(import_root,sizeof(import_root),"%s",argv[2]);
+    char tiny[4];assert(modern_dlc_join(tiny,sizeof(tiny),"a","b") && !strcmp(tiny,"a/b"));assert(!modern_dlc_join(tiny,3,"a","b"));
     g_ui.page=UI_DLC;modern_dlc_request(0,0);
     assert(modern_dlc_busy() && !probe_reads && !config_reads && !g_dlc_count);
     modern_dlc_tick();assert(config_reads==1 && !g_dlc_count);

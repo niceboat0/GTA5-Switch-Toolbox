@@ -23,10 +23,17 @@ static void modern_dlc_request(int section,int force) {
     g_dlc_scan_next=section && !g_dlc_ready[0]?1:-1;
     modern_dlc_start(section && !g_dlc_ready[0]?0:section);
 }
+static int modern_dlc_join(char *out,size_t cap,const char *base,const char *leaf) {
+    size_t a=strlen(base),b=strlen(leaf);if(a>=cap || b>=cap-a || a+b+2>cap)return 0;
+    memcpy(out,base,a);out[a]='/';memcpy(out+a+1,leaf,b+1);return 1;
+}
 static int modern_dlc_compare(const void *a,const void *b) {return strcmp(((const DlcItem*)a)->name,((const DlcItem*)b)->name);}
 static void modern_dlc_finish(void) {
     int section=g_dlc_scan_section,n=section?g_dlc_src_count:g_dlc_count;
-    qsort(section?g_dlc_src:g_dlc_items,(size_t)n,sizeof(DlcItem),modern_dlc_compare);
+    DlcItem *items=section?g_dlc_src:g_dlc_items;char selected[96]={0};
+    if(g_ui.page==UI_DLC && g_ui.section==section && g_ui.selected>=0 && g_ui.selected<n)snprintf(selected,sizeof(selected),"%s",items[g_ui.selected].name);
+    qsort(items,(size_t)n,sizeof(DlcItem),modern_dlc_compare);
+    if(selected[0])for(int i=0;i<n;i++)if(!strcmp(items[i].name,selected)) {g_ui.selected=i;break;}
     g_dlc_ready[section]=1;g_dlc_scan_section=-1;
     snprintf(g_dlc_msg,sizeof(g_dlc_msg),TR("目录已载入：%d 个 DLC；资源信息按需读取。新增文件后可重新扫描。","Loaded %d DLC folders; resource details load on demand. Rescan after adding files."),n);g_dlc_msg_ok=g_dlc_xml_loaded;
     if(!g_dlc_xml_loaded)snprintf(g_dlc_msg,sizeof(g_dlc_msg),"%s",TR("目录已载入；游戏配置读取失败，请检查路径后重新扫描。","Folders loaded; game configuration could not be read. Check paths and rescan."));
@@ -57,7 +64,7 @@ static int modern_dlc_tick(void) {
             }
             if(duplicate)continue;
             char folder[768],path[800];struct stat info;
-            snprintf(folder,sizeof(folder),"%s/%s",base,entry->d_name);
+            if(!modern_dlc_join(folder,sizeof(folder),base,entry->d_name))continue;
             if(stat(folder,&info) || !S_ISDIR(info.st_mode))continue;
             snprintf(path,sizeof(path),"%s/dlc.rpf",folder);
             int present=!stat(path,&info) && S_ISREG(info.st_mode) && info.st_size>0;
