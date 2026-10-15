@@ -34,7 +34,7 @@ def test(root,out,zlib_source):
     stage_block=Path(str(timing)+'.toolbox-new');stage_block.mkdir()
     check('staging failure changes neither target',lib.gc_package_install(ctypes.byref(p),None,None,err,512)<0 and
           station.read_bytes()==b'old radio' and timing.read_bytes()==b'old timing')
-    stage_block.rmdir()
+    if stage_block.exists():stage_block.rmdir() # POSIX remove() can already remove an empty directory.
     check('paired install succeeds',lib.gc_package_install(ctypes.byref(p),None,None,err,512)==0)
     check('audio and timing both installed',station.read_bytes()==(payload/'station.rpf').read_bytes() and timing.read_bytes()==(payload/'audio_rel.rpf').read_bytes())
     check('state checks actual installed payloads',lib.gc_package_state(ctypes.byref(p))==1)
