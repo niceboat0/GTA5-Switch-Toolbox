@@ -63,6 +63,7 @@ static void modern_sync(void) {
 }
 static void modern_scan_saves(void) {
     scan_backup_history();
+    if(!g_save_dir[0] && !g_dirty) load_initial_save();
     if(g_save_dir[0]) scan_save_slots(g_save_dir);
     for(int i=0;i<g_num_slots;i++) if(strcmp(g_slots[i].fullpath,g_save_path)==0) {g_active_slot_idx=i;break;}
 }
@@ -153,10 +154,10 @@ static void modern_build(void) {
             if(it->fmt==-2)snprintf(sub,sizeof(sub),TR("%s  /  资源信息按需加载","%s  /  Resource details load on demand"),size);
             else snprintf(sub,sizeof(sub),TR("%s  /  模型 %d  地图 %d  贴图 %d","%s  /  Models %d  Maps %d  Textures %d"),size,it->n_model,it->n_map,it->n_tex);
             snprintf(note,sizeof(note),TR("目录：%s\n刷车名：%s\n%s","Folder: %s\nSpawn name: %s\n%s"),it->name,it->spawn[0]?it->spawn:"-",
-                it->fmt==0?TR("PC 格式可能导致闪退。请先完成 Switch 格式转换再导入。","PC format may crash the game. Convert it to Switch format before import."):TR("注册会同时更新两处游戏配置。建议每次少量添加，再重启游戏验证。","Registration updates both required game configurations. Add a few packs at a time and restart to verify."));
+                it->fmt==0?TR("PC 格式：待导入包按 A 确认后自动转换并导入；已安装包可用「转换格式」。","PC format: pending packs convert automatically after A and confirmation. Installed packs use Convert format."):TR("注册会同时更新两处游戏配置。建议每次少量添加，再重启游戏验证。","Registration updates both required game configurations. Add a few packs at a time and restart to verify."));
             modern_row(it->cn[0]?it->cn:it->name,sub,badge,note,g_ui.section?U_DLC_IMPORT:U_DLC_TOGGLE,i,
                 !it->has_rpf||it->fmt!=1||it->map_st==GC_MAP_BAD?UI_WARN:it->full?UI_ACCENT:UI_MUTED,
-                modern_dlc_busy() || !g_dlc_xml_loaded || !it->has_rpf || it->fmt<0 || (g_ui.section && it->fmt!=1));
+                modern_dlc_busy() || !g_dlc_xml_loaded || !it->has_rpf || it->fmt<0);
         }
         g_view.empty_title=modern_dlc_busy()?TR("正在读取 DLC 目录…","Loading DLC folders…"):g_ui.section?TR("没有待导入的 DLC","No DLC ready to import"):TR("还没有安装 DLC","No installed DLC");
         g_view.empty_body=TR("将包含 dlc.rpf 的文件夹放到下方目录。重新扫描后，在「待导入」中选择要安装的内容。","Place folders containing dlc.rpf in the directory below. Rescan, then choose a pack in Ready to import.");
@@ -273,6 +274,8 @@ static void modern_execute(UiEvent e,int confirmed) {
         const char *target=g_ui.page==UI_MODS?"update2.rpf / script_rel.rpf":g_ui.page==UI_DLC?"update.rpf / dlcpacks":g_ui.page==UI_GRAPHICS?"settings.xml":g_ui.page==UI_SAVES?g_save_path:"update.rpf / gameconfig.xml";
         if(e.action==U_SCRIPT_REMOVE) effect=TR("删除所选脚本条目。该操作不会自动恢复官方原版。","Removes the selected script entry. This does not automatically restore the official original.");
         if(e.action==U_DLC_DELETE) effect=TR("注销并删除所选 DLC 文件夹。删除后需要重新复制文件才能找回。","Unregisters and deletes the selected DLC folder. Copy the original files again to recover it.");
+        if(e.action==U_DLC_IMPORT) effect=TR("将所选包复制到安装目录；PC 格式自动转换为 Switch 格式，校验成功后注册。原始包保持不变。",
+            "Copies the selected pack to the installed folder, converts PC format to Switch, and registers only after validation. The source pack is unchanged.");
         if(e.action==U_DLC_CONVERT) effect=TR("将已安装的包就地转换为 Switch 格式。请保留一份原始 DLC 备份。","Converts the installed pack to Switch format in place. Keep a copy of the original DLC.");
         if(e.action==U_PERF_RESTORE) effect=TR("恢复原版参数并写入 update.rpf。当前未写入的参数调整会被替换。","Restores original parameters and writes update.rpf, replacing pending parameter edits.");
         if(e.action==U_SAVE_PRESET||e.action==U_SAVE_BACKUP) effect=TR("载入所选存档并写入下方目标槽位，写入前执行现有自动备份流程。","Loads the selected save and writes the target slot below using the existing backup-before-save flow.");
@@ -291,14 +294,14 @@ static void modern_execute(UiEvent e,int confirmed) {
     case U_SCRIPT_INFO: script_show_dir();modern_report(TR("脚本目录与安装状态","Script folder & status"),g_script_dirinfo);break;
     case U_DLC_REFRESH: if(g_dlc_dirty)modern_report(TR("请先保存 DLC 修改","Save DLC edits first"),TR("保存未写入修改后再重新扫描。","Save pending edits before rescanning."));else modern_dlc_request(g_ui.section,1);break;
     case U_DLC_TOGGLE: g_dlc_sel=e.param;dlc_toggle_selected();break;
-    case U_DLC_IMPORT: g_dlc_src_sel=e.param;dlc_import_selected();break;
+    case U_DLC_IMPORT: g_dlc_src_sel=e.param;if(dlc_import_selected()==0) modern_dlc_request(g_ui.section,1);break;
     case U_DLC_DELETE: if(dlc_delete_selected()==0) {g_dlc_confirm=0;dlc_do_delete();}break;
     case U_DLC_CONVERT: dlc_convert_selected();break;
     case U_DLC_HD: dlc_hide_hd_selected();break;
     case U_DLC_CHECK:
         modern_dlc_inspect(g_ui.section,g_ui.selected,out,sizeof(out));
         modern_report(TR("DLC 车辆与资源检查","DLC vehicles & resources"),out);break;
-    case U_DLC_INFO: modern_report(TR("DLC 目录说明","DLC folders"),TR("待导入目录：\nsdmc:/switch/gta5save/dlc/\n每个文件夹需包含 dlc.rpf，导入前须转换为 Switch 格式。\n\n游戏安装目录：\n/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/\n\n已安装的 PC 格式包可用「转换格式」处理。","Import folder:\nsdmc:/switch/gta5save/dlc/\nEach folder needs dlc.rpf in Switch format before import.\n\nInstalled folder:\n/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/\n\nUse Convert format for installed PC-format packs."));break;
+    case U_DLC_INFO: modern_report(TR("DLC 目录说明","DLC folders"),TR("待导入目录：\nsdmc:/switch/gta5save/dlc/\n每个文件夹需包含 dlc.rpf。选择后按 A 并确认，PC 格式会自动转换再导入。\n\n游戏安装目录：\n/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/\n\n已安装的 PC 格式包可用「转换格式」处理。","Import folder:\nsdmc:/switch/gta5save/dlc/\nEach folder needs dlc.rpf. Press A and confirm; PC packs convert automatically before registration.\n\nInstalled folder:\n/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/\n\nUse Convert format for installed PC-format packs."));break;
     case U_GFX_PRESET: gfx_apply_preset(e.param);break;
     case U_GFX_IMPORT: if(e.param>=0 && e.param<g_gfx_switch_count) gfx_import_from_switch(g_gfx_switch_files[e.param]);break;
     case U_GFX_SAVE: gfx_save();break;
@@ -312,7 +315,7 @@ static void modern_execute(UiEvent e,int confirmed) {
     case U_SAVE_BACKUP: if(load_backup_save(e.param)==0) save_to_disk();break;
     case U_SAVE_SLOT: if(g_dirty) {modern_report(TR("请先保存待写入修改","Save pending changes first"),TR("当前存档有未写入修改。先选择「保存待写入修改」，再切换槽位。","The current save has pending changes. Choose Save pending before switching slots."));} else switch_to_slot(e.param);break;
     case U_SAVE_WRITE: save_to_disk();break;
-    case U_SAVE_REFRESH: if(g_ui.page==UI_GRAPHICS) {scan_switch_gfx_files();if(!g_gfx_dirty) gfx_load();} else modern_scan_saves();break;
+    case U_SAVE_REFRESH: if(g_ui.page==UI_GRAPHICS) {if(!g_save_dir[0] && !g_dirty) load_initial_save();scan_switch_gfx_files();if(!g_gfx_dirty) gfx_load();} else modern_scan_saves();break;
     case U_PERF_LOAD: if(g_gc_dirty && !confirmed) modern_report(TR("请先保存参数","Save parameters first"),TR("当前有参数修改，请先写入后再载入。","Write pending parameter changes before reloading."));else if(g_gc_opened) gc_reload_from_disk();else gc_open_rpf();break;
     case U_PERF_WRITE: gc_write_to_rpf();break;
     case U_PERF_RESTORE: if(gc_restore_original()==GC_OK) gc_write_to_rpf();break;
@@ -322,7 +325,7 @@ static void modern_execute(UiEvent e,int confirmed) {
     case U_EXIT: g_ui_running=0;break;
     default: break;
     }
-    if(e.action==U_DLC_IMPORT || e.action==U_DLC_DELETE || e.action==U_DLC_CONVERT || e.action==U_DLC_HD) {
+    if(e.action==U_DLC_DELETE || e.action==U_DLC_CONVERT || e.action==U_DLC_HD) {
         modern_dlc_request(g_ui.section,1);
     }
 }

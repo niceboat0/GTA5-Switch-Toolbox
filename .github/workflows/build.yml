@@ -20,6 +20,9 @@ jobs:
           ./build/navigation-test
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g source/save_backup.c tests/save_backup_test.c -o build/save-backup-test
           ./build/save-backup-test
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/save_io_fault_test.c -o build/save-io-fault-test
+          ./build/save-io-fault-test
+          python3 tests/test_save_paths.py --output build/save-paths
       - name: Exercise script, package and exporter backends
         run: |
           sudo apt-get update -qq
@@ -30,6 +33,7 @@ jobs:
           python3 tests/test_exporter.py --output build/exporter
           python3 tests/test_vehicles.py --output build/vehicles
           python3 tests/test_catalog.py --output build/catalog
+          python3 tests/test_dlc_import.py --output build/dlc-import
   switch:
     runs-on: ubuntu-latest
     container: devkitpro/devkita64:20260219

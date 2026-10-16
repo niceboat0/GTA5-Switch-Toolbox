@@ -8,6 +8,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <errno.h>
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -770,12 +771,6 @@ static void gc_build_diag(void) {
     }
 }
 
-/* 固定候选画质路径 - 已清空: 实机 MD5 诊断确认游戏真实读取位置 = 存档同目录
- * (原生挂载=save:/settings.xml), 画质与存档写入同一目录即可, 无需其他固定路径。
- * 保留该数组仅为兼容旧代码引用; 写入完全依赖 g_save_dir/settings.xml */
-static const char *gfx_all_candidates[] = {
-    "",
-};
 /* 路径自检结果展示 (画质页 X 键), 前 14 条可读写/存在/不存在 */
 static char g_check_paths[14][160];
 static int  g_check_paths_count = 0;
@@ -979,31 +974,64 @@ static void ensure_dir(const char *dir) {
     mkdir(tmp, 0777);
 }
 
-/* 自动时间戳备份 (保存在 /switch/gta5save/<时间戳>/) */
+static unsigned g_write_failure_serial;
+
+/* Keep the actual failing operation, rather than guessing a permissions issue. */
+static void save_io_report(const char *operation, const SaveIoError *error, Result commit_result) {
+    g_write_failure_serial++;
+    const char *stage=error->stage?error->stage:"unknown";
+    ensure_dir("sdmc:/switch/gta5save");
+    const char *log_path="sdmc:/switch/gta5save/write_fail.log";
+    FILE *log=fopen(log_path,"a");
+    if(!log) {log_path="sdmc:/gta5save-write-fail.log";log=fopen(log_path,"a");}
+    int logged=0;
+    if(log) {
+        int count=fprintf(log,"time=%" PRIu64 " operation=%s stage=%s errno=%d (%s) commit=0x%08" PRIx32
+            "\npath=%s\nsave_dir=%s\nslot=%s\nsettings_source=%s\n\n",
+            (uint64_t)time(NULL),operation,stage,error->code,strerror(error->code),(uint32_t)commit_result,
+            error->path,g_save_dir,g_save_path,g_gfx_path);
+        int closed=fclose(log);logged=count>0 && closed==0;
+    }
+    if(strcmp(stage,"target")==0 && error->code==ENODEV) {
+        snprintf(g_status_msg,sizeof(g_status_msg),TR("%s失败：未找到游戏存档目录。先在游戏中保存一次，退出游戏后点「重新扫描」。",
+            "%s failed: no game save target. Save once in game, close it, then Rescan."),operation);
+    } else {
+        const char *hint=error->code==ENOSPC?TR("空间不足","disk full"):
+            (error->code==ENOTDIR?TR("目录被同名文件占用","a folder path is a file"):
+            ((error->code==EACCES || error->code==EROFS)?TR("访问被拒绝或只读","access denied or read-only"):strerror(error->code)));
+        snprintf(g_status_msg,sizeof(g_status_msg),TR("%s失败 [%s, errno=%d, rc=%08" PRIx32 "]：%s。%s",
+            "%s failed [%s, errno=%d, rc=%08" PRIx32 "]: %s. %s"),
+            operation,stage,error->code,(uint32_t)commit_result,hint,
+            logged?log_path:TR("日志也无法写入","log could not be written"));
+    }
+    g_status_color=C_RED;
+}
+
+/* Back up the actual disk slot before replacing it with a bundled save. */
 static int backup_current_save_timestamp(const char *reason) {
-    if (!g_save_path[0]) return 0;
+    if(!g_save_path[0]) {
+        SaveIoError error={"target",ENODEV,""};
+        save_io_report(TR("存档备份","Save backup"),&error,0);return 0;
+    }
     time_t now=time(NULL);
     struct tm *tm_info=localtime(&now);
-    char stamp[64],backup_dir[512],destination[640];
+    char stamp[64],destination[640];
     if(tm_info) strftime(stamp,sizeof(stamp),"%Y%m%d_%H%M%S",tm_info);
     else snprintf(stamp,sizeof(stamp),"backup_%" PRIu64,(uint64_t)now);
-    struct stat st;
-    int unique=0;
-    for(int i=0;i<1000;i++) {
-        snprintf(backup_dir,sizeof(backup_dir),"sdmc:/switch/gta5save/%s_%03d",stamp,i);
-        if(stat(backup_dir,&st)!=0) {unique=1;break;}
+    SaveIoError error;
+    if(save_backup_create(g_save_path,"sdmc:/switch/gta5save",stamp,destination,sizeof(destination),&error)!=0) {
+        save_io_report(TR("存档备份","Save backup"),&error,0);return 0;
     }
-    if(!unique) return 0;
-    ensure_dir(backup_dir);
-    const char *name=strrchr(g_save_path,'/');name=name?name+1:g_save_path;
-    snprintf(destination,sizeof(destination),"%s/%s",backup_dir,name);
-    /* The loaded buffer may already contain a selected preset or backup. Copy
-     * the actual disk target so the player's previous save remains recoverable. */
-    if(save_backup_copy(g_save_path,destination)!=0) return 0;
-    if(R_FAILED(fsdevCommitDevice("sdmc"))) return 0;
-    char info_path[640];snprintf(info_path,sizeof(info_path),"%s/info.txt",backup_dir);
+    Result rc=fsdevCommitDevice("sdmc");
+    if(R_FAILED(rc)) {
+        error=(SaveIoError){"backup-commit",EIO,""};
+        snprintf(error.path,sizeof(error.path),"%s",destination);
+        save_io_report(TR("存档备份","Save backup"),&error,rc);return 0;
+    }
+    char info_path[640];snprintf(info_path,sizeof(info_path),"%s",destination);
+    char *name=strrchr(info_path,'/');if(name) snprintf(name+1,sizeof(info_path)-(size_t)(name+1-info_path),"info.txt");
     FILE *fp=fopen(info_path,"w");
-    if(fp) {fprintf(fp,"%s | %s | %s\n",stamp,reason,name);fclose(fp);}
+    if(fp) {fprintf(fp,"%s | %s | %s\n",stamp,reason,g_save_path);fclose(fp);}
     return 1;
 }
 
@@ -1281,11 +1309,11 @@ static char *xml_next_line(char *buf, size_t buflen, size_t *pos) {
     return line;
 }
 
-/* 前置声明: 多路径写入辅助函数 (定义在 gfx_save_to_file 之后) */
-static int gfx_write_multi_paths(const char *buf, size_t rd);
+/* Write settings only to the game save directory, never to an import source. */
+static int gfx_write_target(const char *buf, size_t rd);
 static int gfx_load(void);
 
-/* 将当前 g_gfx_items 解析结果写回所有候选 settings.xml 并保存 */
+/* Write the edited settings.xml to the detected game save directory. */
 static int gfx_save_to_file(void) {
     if (g_gfx_count == 0) return -1;
     /* 源文件可能已被移动/删除(例如换过导入文件), 自动重新定位 */
@@ -1366,8 +1394,8 @@ static int gfx_save_to_file(void) {
     free(buf);
     if (replaced == 0) { free(out_buf); return -1; }
 
-    /* 多路径写入 (含存档目录 / /switch/gta5save/ / SD根目录) */
-    int wrote = gfx_write_multi_paths(out_buf, out_len);
+    /* SD XML files are import sources; the game reads the save directory. */
+    int wrote = gfx_write_target(out_buf, out_len);
     free(out_buf);
     return wrote > 0 ? 0 : -1;
 }
@@ -1375,13 +1403,17 @@ static int gfx_save_to_file(void) {
 /* 保存画质 (供 A 键/退出时调用; 返回0=成功) */
 static int gfx_save(void) {
     if (!g_gfx_dirty) return 0;
+    unsigned before=g_write_failure_serial;
     if (gfx_save_to_file() != 0) {
-        snprintf(g_status_msg, sizeof(g_status_msg), TR("画质保存失败! 请确认 settings.xml 可写", "Save failed! Make sure settings.xml is writable"));
-        g_status_color = C_RED;
+        if(before==g_write_failure_serial) {
+            snprintf(g_status_msg,sizeof(g_status_msg),TR("画质保存失败：源配置无法读取或解析。请重新载入预设或 XML。",
+                "Graphics save failed: cannot read or parse source XML. Reload the preset or XML."));
+            g_status_color=C_RED;
+        }
         return -1;
     }
     g_gfx_dirty = 0;
-    snprintf(g_status_msg, sizeof(g_status_msg), TR("画质设置已保存到所有配置位置! 重启游戏生效", "Graphics saved to all config locations! Reboot to take effect"));
+    snprintf(g_status_msg, sizeof(g_status_msg), TR("画质设置已保存到游戏存档目录! 重启游戏生效", "Graphics saved to the game save directory! Reboot to take effect"));
     g_status_color = C_GREEN;
     show_toast(TR("画质已保存", "Graphics saved"), C_GREEN);
     return 0;
@@ -1463,7 +1495,7 @@ static void parent_dir(const char *path, char *dir_out, size_t sz) {
     if (s && s != dir_out) *s = '\0';
 }
 
-/* 检查一个 settings.xml 候选路径的状态: 0=可读写 1=存在只读 2=不存在 3=不可写 */
+/* Read-only diagnostics cannot establish write access: 0=readable, 1=parent exists, 2=unavailable. */
 static int gfx_path_state(const char *path) {
     FILE *t = fopen(path, "rb");
     if (t) { fclose(t); return 0; }  /* 文件存在且可读 */
@@ -1493,75 +1525,34 @@ static void gfx_check_paths(void) {
         else if (st == 1) ro++;
         else if (st == 2) no++;
         snprintf(g_check_paths[total - 1], sizeof(g_check_paths[0]),
-                 "%s : %s", p, st == 0 ? TR("可读写", "rw") : (st == 1 ? TR("不存在(可建)", "missing (creatable)") : TR("目录不存在", "dir missing")));
+                 "%s : %s", p, st == 0 ? TR("可读取", "readable") : (st == 1 ? TR("文件不可读/不存在", "file unreadable/missing") : TR("目录不可用", "dir unavailable")));
     }
     g_check_paths_count = total;
     snprintf(g_status_msg, sizeof(g_status_msg),
-             TR("路径自检完成: 存在 %d / 可新建 %d / 目录缺失 %d (共 %d 条)",
-             "Self-test: exists %d / creatable %d / missing %d (of %d)"), ok, ro, no, total);
+             TR("路径检查: 可读 %d / 文件不可读 %d / 目录不可用 %d (共 %d 条)",
+             "Paths: readable %d / file unavailable %d / directory unavailable %d (of %d)"), ok, ro, no, total);
     g_status_color = (ok > 0) ? C_GREEN : C_RED;
     show_toast(TR("路径自检完成", "Path self-test done"), ok > 0 ? C_GREEN : C_RED);
 }
 
-static int gfx_write_multi_paths(const char *buf, size_t rd) {
-    char cands[12][512];
-    int n = 0;
-    /* 1. 当前定位的画质文件 (存档同目录=save:/settings.xml, 即游戏真实读取位置) */
-    if (g_gfx_path[0]) {
-        snprintf(cands[n++], sizeof(cands[0]), "%s", g_gfx_path);
+static int gfx_write_target(const char *buf, size_t rd) {
+    SaveIoError error;
+    if(save_settings_write(g_save_dir,buf,rd,&error)!=0) {
+        save_io_report(TR("画质写入","Graphics write"),&error,0);return 0;
     }
-    /* 2. 存档目录 (原生挂载=save:/, SD模式=存档目录) - 画质与存档同目录, 游戏必读 */
-    if (g_save_dir[0]) {
-        snprintf(cands[n++], sizeof(cands[0]), "%s/settings.xml", g_save_dir);
-    }
-    /* 3. 固定候选 (已精简为空, 见 gfx_all_candidates 注释) */
-    for (int k = 0; k < (int)(sizeof(gfx_all_candidates)/sizeof(gfx_all_candidates[0])); k++) {
-        if (gfx_all_candidates[k][0]) {
-            snprintf(cands[n++], sizeof(cands[0]), "%s", gfx_all_candidates[k]);
+    if(g_is_native_mount) {
+        Result rc=fsdevCommitDevice("save");
+        if(R_FAILED(rc)) {
+            error=(SaveIoError){"commit",EIO,""};
+            snprintf(error.path,sizeof(error.path),"%s/settings.xml",g_save_dir);
+            save_io_report(TR("画质写入","Graphics write"),&error,rc);return 0;
         }
     }
-
-    int wrote = 0;
-    int mkfail = 0;
-    for (int i = 0; i < n; i++) {
-        /* 跳过重复 */
-        int dup = 0;
-        for (int j = 0; j < i; j++) {
-            if (strcmp(cands[i], cands[j]) == 0) { dup = 1; break; }
-        }
-        if (dup) continue;
-        /* 父目录不存在时自动创建 (fopen "w" 不会建目录) */
-        char parent[512];
-        parent_dir(cands[i], parent, sizeof(parent));
-        if (parent[0] && strcmp(parent, cands[i]) != 0) {
-            ensure_dir(parent);
-        }
-        FILE *ofp = fopen(cands[i], "w");
-        if (ofp) {
-            fwrite(buf, 1, rd, ofp);
-            fclose(ofp);
-            wrote++;
-        } else {
-            mkfail++;
-        }
-    }
-    /* 原生挂载模式: 写入系统内部存档区后必须 commit 才会落盘 */
-    if (g_is_native_mount) {
-        fsdevCommitDevice("save");
-    }
-    if (wrote == 0 && mkfail > 0) {
-        /* 全部路径都写失败: 记录详细日志供诊断 */
-        FILE *lf = fopen("sdmc:/switch/gta5save/write_fail.log", "w");
-        if (lf) {
-            fprintf(lf, TR("gfx_write_multi_paths: 所有 %d 个候选路径写入失败!\n", "gfx_write_multi_paths: all %d candidate writes failed!\n"), n);
-            for (int i = 0; i < n; i++) fprintf(lf, "  [%d] %s\n", i, cands[i]);
-            fclose(lf);
-        }
-    }
-    return wrote;
+    snprintf(g_gfx_path,sizeof(g_gfx_path),"%.*s/settings.xml",(int)sizeof(g_gfx_path)-14,g_save_dir);
+    return 1;
 }
 
-/* 应用一套画质预设 (整体覆盖所有候选 settings.xml) */
+/* Apply a graphics preset to the detected game settings.xml. */
 static int gfx_apply_preset(int idx) {
     if (idx < 0 || idx >= (int)NUM_GFX_PRESETS) return -1;
     char *buf = NULL;
@@ -1572,9 +1563,9 @@ static int gfx_apply_preset(int idx) {
         return -1;
     }
 
-    /* 1. 用预设内容整体覆盖所有候选 settings.xml (多路径写入确保游戏读到) */
+    /* 1. Write and commit the real game target before reporting success. */
     int applied_to_file = 0;
-    applied_to_file = gfx_write_multi_paths(buf, rd);
+    applied_to_file = gfx_write_target(buf, rd);
 
     /* 2. 解析预设内容到缓冲供 UI 显示 */
     gfx_parse_xml(buf, rd);
@@ -1588,15 +1579,15 @@ static int gfx_apply_preset(int idx) {
         show_toast(TR("画质预设已应用", "GFX preset applied"), C_ACCENT);
     } else {
         g_gfx_dirty = 1;
-        snprintf(g_status_msg, sizeof(g_status_msg), TR("预设无法写入磁盘! 检查 /switch/gta5save/ 目录写权限 (详见 write_fail.log)",
-        "Cannot write preset! Check /switch/gta5save/ write permission (see write_fail.log)"));
-        g_status_color = C_RED;
+        snprintf(g_gfx_path,sizeof(g_gfx_path),"%s",GFX_PRESET(idx).path);
+        /* Preserve this preset as the pending source for a later retry. */
+        return -1;
     }
     return 0;
 }
 
 /* 从 /switch/gta5save/ 目录导入指定画质文件作为当前画质配置
- * (复制到目标画质文件并重新解析; 无目标时直接以该文件为当前画质)
+ * (复制到游戏存档目录并重新解析; 无目标时返回具体错误)
  * fname: 文件名(如 settings.xml / settings_high.xml), NULL 时用 settings.xml */
 static int gfx_import_from_switch(const char *fname) {
     char src[512];
@@ -1617,18 +1608,15 @@ static int gfx_import_from_switch(const char *fname) {
     size_t rd = gfx_read_all(src, &buf);
     if (!buf || rd == 0) return -1;
 
-    /* 导入内容同步写入所有候选画质路径 (确保游戏读到) */
-    int wrote = gfx_write_multi_paths(buf, rd);
+    /* Imported XML is a source, not a fallback destination. */
+    int wrote = gfx_write_target(buf, rd);
     if (wrote > 0) {
         g_gfx_dirty = 0;
     } else {
-        /* 无目标可写时, 把导入文件作为当前画质 */
-        strncpy(g_gfx_path, src, sizeof(g_gfx_path) - 1);
-        g_gfx_path[sizeof(g_gfx_path) - 1] = '\0';
+        /* Keep the selected XML for preview/retry; writes still require the game target. */
+        snprintf(g_gfx_path,sizeof(g_gfx_path),"%s",src);
+        gfx_parse_xml(buf,rd);
         g_gfx_dirty = 1;
-        snprintf(g_status_msg, sizeof(g_status_msg), TR("导入失败! 无法写入任何配置位置 (见 /switch/gta5save/write_fail.log)",
-        "Import failed! no config location writable (see write_fail.log)"));
-        g_status_color = C_RED;
         free(buf);
         return -1;
     }
@@ -1945,12 +1933,7 @@ static int save_to_disk(void) {
     if (!g_is_plain || !g_save_buf) return -1;
 
     /* 仅在点击保存前做一次时间戳留底备份 */
-    if (!backup_current_save_timestamp(TR("保存前备份", "backup before save"))) {
-        snprintf(g_status_msg,sizeof(g_status_msg),TR("备份当前槽位失败，已取消写入。请检查 SD 卡空间与目录权限。",
-            "Could not back up the current slot. Write cancelled. Check SD space and folder permissions."));
-        g_status_color=C_RED;
-        return -1;
-    }
+    if (!backup_current_save_timestamp(TR("保存前备份", "backup before save"))) return -1;
 
     /* 将三位角色当前的所有修改回写到解密内存缓冲区 */
     for (int i = 0; i < 3; i++) {
@@ -1983,26 +1966,28 @@ static int save_to_disk(void) {
         return -1;
     }
 
-    FILE *fp = fopen(g_save_path, "wb");
-    if (!fp) {
-        free(enc_buf);
-        snprintf(g_status_msg, sizeof(g_status_msg), TR("写入磁盘失败! 请检查写保护", "Disk write failed! check write protection"));
-        g_status_color = C_RED;
+    SaveIoError error;
+    if(save_io_write(g_save_path,enc_buf,g_save_sz,&error)!=0) {
+        free(enc_buf);g_dirty=1;
+        save_io_report(TR("存档写入（原档备份已保留）","Save write (backup kept)"),&error,0);
         return -1;
     }
-    fwrite(enc_buf, 1, g_save_sz, fp);
-    fclose(fp);
     free(enc_buf);
-
-    if (g_is_native_mount) {
-        fsdevCommitDevice("save");
+    if(g_is_native_mount) {
+        Result rc=fsdevCommitDevice("save");
+        if(R_FAILED(rc)) {
+            error=(SaveIoError){"commit",EIO,""};
+            snprintf(error.path,sizeof(error.path),"%s",g_save_path);g_dirty=1;
+            save_io_report(TR("存档提交（原档备份已保留）","Save commit (backup kept)"),&error,rc);
+            return -1;
+        }
     }
 
     g_dirty = 0;
     const char *fn = strrchr(g_save_path, '/');
     if (fn) fn++; else fn = g_save_path;
-    snprintf(g_status_msg, sizeof(g_status_msg), TR("[已保存成功] 写入 %s! 进游戏请通过【暂停->游戏->载入游戏】手动载入该槽位生效",
-                                                 "[Saved] Wrote %s! In game use Pause > Game > Load Game to activate the slot"), fn);
+    snprintf(g_status_msg, sizeof(g_status_msg), TR("[已保存成功] 写入 %.96s! 进游戏请通过【暂停->游戏->载入游戏】手动载入该槽位生效",
+                                                 "[Saved] Wrote %.96s! In game use Pause > Game > Load Game to activate the slot"), fn);
     g_status_color = C_GREEN;
     show_toast(TR("已保存修改", "Changes saved"), C_GREEN);
     return 0;
@@ -3170,9 +3155,17 @@ static int dlc_import_selected(void) {
     }
     const char *name = g_dlc_src[g_dlc_src_sel].name;
 
-    char src[700];
-    if (dlc_src_path_of(name, src, sizeof(src)) != 0) {
+    char src[768];
+    const char *discovered=g_dlc_src[g_dlc_src_sel].source_path;
+    if(discovered[0]) snprintf(src,sizeof(src),"%s",discovered);
+    else if (dlc_src_path_of(name, src, sizeof(src)) != 0) {
         dlc_err(TR("找不到 %s 的源目录", "source dir of %s not found"), name); return -1;
+    }
+    char source_rpf[800];snprintf(source_rpf,sizeof(source_rpf),"%s/dlc.rpf",src);
+    if(gc_dlc_is_switch_format(source_rpf)<0) {
+        dlc_err(TR("%s 的 dlc.rpf 无法读取或格式无效，未导入也未注册。",
+            "%s has an unreadable or invalid dlc.rpf; nothing imported or registered."),name);
+        return -1;
     }
     char dst[700];
     snprintf(dst, sizeof(dst), "%s/%s", DLC_DLCPACKS, name);
@@ -3208,13 +3201,13 @@ static int dlc_import_selected(void) {
         }
         converted = 1;
         fsdevCommitDevice("sdmc");
-        /* 转换后再确认一次 */
-        int fmt2 = gc_dlc_is_switch_format(rpfpath);
-        if (fmt2 != 1) {
-            dlc_prog_end();
-            dlc_err(TR("★ 转换后仍不是 Switch 格式，已中止（避免闪退）", "* still not Switch format after convert, aborted (avoid crash)"));
-            return -1;
-        }
+    }
+    /* Validate every destination, including failed reads/copies and partial conversion. */
+    if(gc_dlc_is_switch_format(rpfpath)!=1 || cst.n_skipped_compressed>0) {
+        dlc_prog_end();
+        dlc_err(TR("%s 转换校验失败或存在未转换的压缩内嵌 RPF，已停止注册。原始包未改动。",
+            "%s conversion validation failed or compressed nested RPFs remain; registration stopped. Source unchanged."),name);
+        return -1;
     }
 
     /* ---- (2) 注册 ---- */
@@ -3267,13 +3260,6 @@ static int dlc_import_selected(void) {
                 chk[0] ? "  |  " : "", chk);
     }
     g_dlc_msg_ok = (v1 == GC_OK && v2 == GC_OK) ? 1 : 0;
-    if (cst.n_skipped_compressed > 0) {
-        dlc_err(TR("注意：有 %d 个压缩存储的内嵌 rpf 未处理，可能影响兼容性",
-           "note: %d compressed embedded rpfs untouched, may affect compatibility"),
-                cst.n_skipped_compressed);
-        g_dlc_msg_ok = 0;
-    }
-
     /* 刷新列表 */
     dlc_scan_dlcpacks();
     dlc_scan_src();

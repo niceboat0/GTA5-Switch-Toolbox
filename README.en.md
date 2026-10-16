@@ -23,6 +23,19 @@ Restoring them recovers everything:
 The in-tool "Restore stock scripts" only restores 3 script entries —
 **it is not a substitute for a full backup**.
 
+## v7.2.4 automatic DLC conversion on import
+
+- PC-format pending packs are selectable again. Press A and confirm to copy, convert to Switch format, validate and register. The source pack stays unchanged.
+- Use the discovered source directory. Invalid RPFs, conversion failures and unconverted compressed nested RPFs stop before registration. Keep failure details visible instead of replacing them immediately with scan status.
+- Includes v7.2.3 write diagnostics. Host tests do not establish in-game compatibility of individual vehicle or map packs.
+
+## v7.2.3 write failure diagnostics (console validation pending)
+
+- A missing game save target now prompts to save in game, close the game, and Rescan, rather than blaming SD folder permissions.
+- Graphics writes only target the detected game save directory. An imported SD XML file cannot serve as a fallback destination that falsely reports success.
+- Check backup directory creation, complete writes, flush, close and native save commit. Failures retain pending changes and the original slot backup, with operation, stage, path, errno and commit result in the log.
+- Log to `/switch/gta5save/write_fail.log`, falling back to `/gta5save-write-fail.log` if the folder is unavailable. The original report's version and exact trigger remain unconfirmed.
+
 ## Features and controls (v7.0)
 
 Native 1280×720 interface with a fixed sidebar, overview, segmented libraries,
@@ -53,7 +66,7 @@ are preserved. In-game menu: **L + D-pad down** for MEGATARD/ragemenu;
 Ready to import scans folders containing `dlc.rpf` under `/switch/gta5save/dlc/`.
 Installed packs live under
 `/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/`.
-PC-format packs are labelled and blocked from direct import. Convert them to Switch format first.
+PC-format packs are labelled; press A and confirm to copy, convert automatically and register after validation.
 Inspect opens the resource report.
 
 **Graphics:** Presets open by default with stock-clock choices first. Fine-tuning changes stay
