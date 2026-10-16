@@ -23,6 +23,8 @@ HEADER=r'''
 #ifdef _WIN32
 #include <direct.h>
 #define mkdir(path,mode) _mkdir(path)
+#else
+#include <unistd.h>
 #endif
 #include <sys/stat.h>
 typedef uint32_t Result;

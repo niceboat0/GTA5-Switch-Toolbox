@@ -142,7 +142,7 @@ int save_io_write(const char *path, const void *data, size_t size, SaveIoError *
 int save_settings_write(const char *directory, const void *data, size_t size, SaveIoError *error) {
     if(error) memset(error,0,sizeof(*error));
     if(!directory || !directory[0]) return io_error(error,"target","",ENODEV);
-    char path[640];
+    char path[512];
     if(snprintf(path,sizeof(path),"%s/settings.xml",directory)>=(int)sizeof(path))
         return io_error(error,"target",directory,ENAMETOOLONG);
     return save_io_write(path,data,size,error);

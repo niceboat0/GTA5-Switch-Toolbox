@@ -1548,7 +1548,7 @@ static int gfx_write_target(const char *buf, size_t rd) {
             save_io_report(TR("画质写入","Graphics write"),&error,rc);return 0;
         }
     }
-    snprintf(g_gfx_path,sizeof(g_gfx_path),"%s/settings.xml",g_save_dir);
+    snprintf(g_gfx_path,sizeof(g_gfx_path),"%.*s/settings.xml",(int)sizeof(g_gfx_path)-14,g_save_dir);
     return 1;
 }
 
@@ -1986,8 +1986,8 @@ static int save_to_disk(void) {
     g_dirty = 0;
     const char *fn = strrchr(g_save_path, '/');
     if (fn) fn++; else fn = g_save_path;
-    snprintf(g_status_msg, sizeof(g_status_msg), TR("[已保存成功] 写入 %s! 进游戏请通过【暂停->游戏->载入游戏】手动载入该槽位生效",
-                                                 "[Saved] Wrote %s! In game use Pause > Game > Load Game to activate the slot"), fn);
+    snprintf(g_status_msg, sizeof(g_status_msg), TR("[已保存成功] 写入 %.96s! 进游戏请通过【暂停->游戏->载入游戏】手动载入该槽位生效",
+                                                 "[Saved] Wrote %.96s! In game use Pause > Game > Load Game to activate the slot"), fn);
     g_status_color = C_GREEN;
     show_toast(TR("已保存修改", "Changes saved"), C_GREEN);
     return 0;
