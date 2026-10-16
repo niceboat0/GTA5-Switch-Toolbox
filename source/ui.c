@@ -258,7 +258,7 @@ void ui_render(const UiCanvas *c,UiState *s,const UiView *v) {
         hit(c,16,y,196,49,UI_GO_PAGE,i);
     }
     text(c,30,617,13,"GTA5 SWITCH TOOLBOX",UI_MUTED);
-    text(c,30,642,12,"v7.2.2",UI_MUTED);
+    text(c,30,642,12,"v7.2.3",UI_MUTED);
     text(c,30,680,12,T(v,"L / R  切换页面","L / R  Switch page"),UI_MUTED);
 
     if(s->page==UI_HOME) {

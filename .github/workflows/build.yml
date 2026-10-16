@@ -20,6 +20,9 @@ jobs:
           ./build/navigation-test
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g source/save_backup.c tests/save_backup_test.c -o build/save-backup-test
           ./build/save-backup-test
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g tests/save_io_fault_test.c -o build/save-io-fault-test
+          ./build/save-io-fault-test
+          python3 tests/test_save_paths.py --output build/save-paths
       - name: Exercise script, package and exporter backends
         run: |
           sudo apt-get update -qq

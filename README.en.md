@@ -23,6 +23,13 @@ Restoring them recovers everything:
 The in-tool "Restore stock scripts" only restores 3 script entries —
 **it is not a substitute for a full backup**.
 
+## v7.2.3 write failure diagnostics (console validation pending)
+
+- A missing game save target now prompts to save in game, close the game, and Rescan, rather than blaming SD folder permissions.
+- Graphics writes only target the detected game save directory. An imported SD XML file cannot serve as a fallback destination that falsely reports success.
+- Check backup directory creation, complete writes, flush, close and native save commit. Failures retain pending changes and the original slot backup, with operation, stage, path, errno and commit result in the log.
+- Log to `/switch/gta5save/write_fail.log`, falling back to `/gta5save-write-fail.log` if the folder is unavailable. The original report's version and exact trigger remain unconfirmed.
+
 ## Features and controls (v7.0)
 
 Native 1280×720 interface with a fixed sidebar, overview, segmented libraries,

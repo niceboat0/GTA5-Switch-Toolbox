@@ -63,6 +63,7 @@ static void modern_sync(void) {
 }
 static void modern_scan_saves(void) {
     scan_backup_history();
+    if(!g_save_dir[0] && !g_dirty) load_initial_save();
     if(g_save_dir[0]) scan_save_slots(g_save_dir);
     for(int i=0;i<g_num_slots;i++) if(strcmp(g_slots[i].fullpath,g_save_path)==0) {g_active_slot_idx=i;break;}
 }
@@ -312,7 +313,7 @@ static void modern_execute(UiEvent e,int confirmed) {
     case U_SAVE_BACKUP: if(load_backup_save(e.param)==0) save_to_disk();break;
     case U_SAVE_SLOT: if(g_dirty) {modern_report(TR("请先保存待写入修改","Save pending changes first"),TR("当前存档有未写入修改。先选择「保存待写入修改」，再切换槽位。","The current save has pending changes. Choose Save pending before switching slots."));} else switch_to_slot(e.param);break;
     case U_SAVE_WRITE: save_to_disk();break;
-    case U_SAVE_REFRESH: if(g_ui.page==UI_GRAPHICS) {scan_switch_gfx_files();if(!g_gfx_dirty) gfx_load();} else modern_scan_saves();break;
+    case U_SAVE_REFRESH: if(g_ui.page==UI_GRAPHICS) {if(!g_save_dir[0] && !g_dirty) load_initial_save();scan_switch_gfx_files();if(!g_gfx_dirty) gfx_load();} else modern_scan_saves();break;
     case U_PERF_LOAD: if(g_gc_dirty && !confirmed) modern_report(TR("请先保存参数","Save parameters first"),TR("当前有参数修改，请先写入后再载入。","Write pending parameter changes before reloading."));else if(g_gc_opened) gc_reload_from_disk();else gc_open_rpf();break;
     case U_PERF_WRITE: gc_write_to_rpf();break;
     case U_PERF_RESTORE: if(gc_restore_original()==GC_OK) gc_write_to_rpf();break;

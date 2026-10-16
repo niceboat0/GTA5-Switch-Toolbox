@@ -11,7 +11,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 
 APP_TITLE   := GTA V Switch Toolbox
 APP_AUTHOR  := niceboat
-APP_VERSION := 7.2.2
+APP_VERSION := 7.2.3
 ICON        := icon.jpg
 
 TARGET		:=	gta5save
