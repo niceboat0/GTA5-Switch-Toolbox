@@ -23,6 +23,12 @@ Restoring them recovers everything:
 The in-tool "Restore stock scripts" only restores 3 script entries —
 **it is not a substitute for a full backup**.
 
+## v7.2.4 automatic DLC conversion on import
+
+- PC-format pending packs are selectable again. Press A and confirm to copy, convert to Switch format, validate and register. The source pack stays unchanged.
+- Use the discovered source directory. Invalid RPFs, conversion failures and unconverted compressed nested RPFs stop before registration. Keep failure details visible instead of replacing them immediately with scan status.
+- Includes v7.2.3 write diagnostics. Host tests do not establish in-game compatibility of individual vehicle or map packs.
+
 ## v7.2.3 write failure diagnostics (console validation pending)
 
 - A missing game save target now prompts to save in game, close the game, and Rescan, rather than blaming SD folder permissions.
@@ -60,7 +66,7 @@ are preserved. In-game menu: **L + D-pad down** for MEGATARD/ragemenu;
 Ready to import scans folders containing `dlc.rpf` under `/switch/gta5save/dlc/`.
 Installed packs live under
 `/atmosphere/contents/0100b00b51230000/romfs/update/switch/dlcpacks/`.
-PC-format packs are labelled and blocked from direct import. Convert them to Switch format first.
+PC-format packs are labelled; press A and confirm to copy, convert automatically and register after validation.
 Inspect opens the resource report.
 
 **Graphics:** Presets open by default with stock-clock choices first. Fine-tuning changes stay

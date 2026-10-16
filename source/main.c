@@ -3155,9 +3155,17 @@ static int dlc_import_selected(void) {
     }
     const char *name = g_dlc_src[g_dlc_src_sel].name;
 
-    char src[700];
-    if (dlc_src_path_of(name, src, sizeof(src)) != 0) {
+    char src[768];
+    const char *discovered=g_dlc_src[g_dlc_src_sel].source_path;
+    if(discovered[0]) snprintf(src,sizeof(src),"%s",discovered);
+    else if (dlc_src_path_of(name, src, sizeof(src)) != 0) {
         dlc_err(TR("找不到 %s 的源目录", "source dir of %s not found"), name); return -1;
+    }
+    char source_rpf[800];snprintf(source_rpf,sizeof(source_rpf),"%s/dlc.rpf",src);
+    if(gc_dlc_is_switch_format(source_rpf)<0) {
+        dlc_err(TR("%s 的 dlc.rpf 无法读取或格式无效，未导入也未注册。",
+            "%s has an unreadable or invalid dlc.rpf; nothing imported or registered."),name);
+        return -1;
     }
     char dst[700];
     snprintf(dst, sizeof(dst), "%s/%s", DLC_DLCPACKS, name);
@@ -3193,13 +3201,13 @@ static int dlc_import_selected(void) {
         }
         converted = 1;
         fsdevCommitDevice("sdmc");
-        /* 转换后再确认一次 */
-        int fmt2 = gc_dlc_is_switch_format(rpfpath);
-        if (fmt2 != 1) {
-            dlc_prog_end();
-            dlc_err(TR("★ 转换后仍不是 Switch 格式，已中止（避免闪退）", "* still not Switch format after convert, aborted (avoid crash)"));
-            return -1;
-        }
+    }
+    /* Validate every destination, including failed reads/copies and partial conversion. */
+    if(gc_dlc_is_switch_format(rpfpath)!=1 || cst.n_skipped_compressed>0) {
+        dlc_prog_end();
+        dlc_err(TR("%s 转换校验失败或存在未转换的压缩内嵌 RPF，已停止注册。原始包未改动。",
+            "%s conversion validation failed or compressed nested RPFs remain; registration stopped. Source unchanged."),name);
+        return -1;
     }
 
     /* ---- (2) 注册 ---- */
@@ -3252,13 +3260,6 @@ static int dlc_import_selected(void) {
                 chk[0] ? "  |  " : "", chk);
     }
     g_dlc_msg_ok = (v1 == GC_OK && v2 == GC_OK) ? 1 : 0;
-    if (cst.n_skipped_compressed > 0) {
-        dlc_err(TR("注意：有 %d 个压缩存储的内嵌 rpf 未处理，可能影响兼容性",
-           "note: %d compressed embedded rpfs untouched, may affect compatibility"),
-                cst.n_skipped_compressed);
-        g_dlc_msg_ok = 0;
-    }
-
     /* 刷新列表 */
     dlc_scan_dlcpacks();
     dlc_scan_src();
